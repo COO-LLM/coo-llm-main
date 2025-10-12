@@ -51,6 +51,6 @@ Client Apps → TruckLLM → LLM Providers
 
 ## Next Steps
 
-- [Overview](overview.md) - Detailed introduction
-- [Architecture](architecture.md) - System design
-- [Quick Start](../guides/deployment.md) - Get running
+- [Overview](Intro/Overview.md) - Detailed introduction
+- [Architecture](Intro/Architecture.md) - System design
+- [Quick Start](../Guides/Deployment.md) - Get running

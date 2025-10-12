@@ -1,116 +1,122 @@
 {
-  "/truckllm/__docusaurus/debug-04a": {
+  "/truckllm/__docusaurus/debug-70d": {
     "__comp": "__comp---theme-debug-config-23-a-2ff",
     "__context": {
-      "plugin": "plugin---truckllm-docusaurus-debugc-7-c-a84"
+      "plugin": "plugin---truckllm-docusaurus-debugb-38-8a1"
     }
   },
-  "/truckllm/__docusaurus/debug/config-21b": {
+  "/truckllm/__docusaurus/debug/config-ec8": {
     "__comp": "__comp---theme-debug-config-23-a-2ff",
     "__context": {
-      "plugin": "plugin---truckllm-docusaurus-debugc-7-c-a84"
+      "plugin": "plugin---truckllm-docusaurus-debugb-38-8a1"
     }
   },
-  "/truckllm/__docusaurus/debug/content-8d5": {
+  "/truckllm/__docusaurus/debug/content-8d7": {
     "__comp": "__comp---theme-debug-contentba-8-ce7",
     "__context": {
-      "plugin": "plugin---truckllm-docusaurus-debugc-7-c-a84"
+      "plugin": "plugin---truckllm-docusaurus-debugb-38-8a1"
     },
-    "allContent": "allContent---truckllm-docusaurus-debug-content-246-3c7"
+    "__props": "__props---truckllm-docusaurus-debug-content-70-d-29d"
   },
-  "/truckllm/__docusaurus/debug/globalData-96e": {
+  "/truckllm/__docusaurus/debug/globalData-f75": {
     "__comp": "__comp---theme-debug-global-dataede-0fa",
     "__context": {
-      "plugin": "plugin---truckllm-docusaurus-debugc-7-c-a84"
+      "plugin": "plugin---truckllm-docusaurus-debugb-38-8a1"
     }
   },
-  "/truckllm/__docusaurus/debug/metadata-35b": {
+  "/truckllm/__docusaurus/debug/metadata-aef": {
     "__comp": "__comp---theme-debug-site-metadata-68-e-3d4",
     "__context": {
-      "plugin": "plugin---truckllm-docusaurus-debugc-7-c-a84"
+      "plugin": "plugin---truckllm-docusaurus-debugb-38-8a1"
     }
   },
-  "/truckllm/__docusaurus/debug/registry-dc2": {
+  "/truckllm/__docusaurus/debug/registry-dfa": {
     "__comp": "__comp---theme-debug-registry-679-501",
     "__context": {
-      "plugin": "plugin---truckllm-docusaurus-debugc-7-c-a84"
+      "plugin": "plugin---truckllm-docusaurus-debugb-38-8a1"
     }
   },
-  "/truckllm/__docusaurus/debug/routes-99f": {
+  "/truckllm/__docusaurus/debug/routes-ca0": {
     "__comp": "__comp---theme-debug-routes-946-699",
     "__context": {
-      "plugin": "plugin---truckllm-docusaurus-debugc-7-c-a84"
+      "plugin": "plugin---truckllm-docusaurus-debugb-38-8a1"
     }
   },
-  "/truckllm/docs-180": {
-    "__comp": "__comp---theme-doc-page-1-be-9be",
+  "/truckllm/docs-9b5": {
+    "__comp": "__comp---theme-docs-root-5-e-9-0b6",
     "__context": {
-      "plugin": "plugin---truckllm-docscc-3-723"
-    },
-    "versionMetadata": "versionMetadata---truckllm-docs-935-824"
+      "plugin": "plugin---truckllm-docsaba-0d4"
+    }
   },
-  "/truckllm/docs/-27b": {
+  "/truckllm/docs-0e8": {
+    "__comp": "__comp---theme-doc-version-roota-7-b-5de",
+    "__props": "__props---truckllm-docs-155-b40"
+  },
+  "/truckllm/docs-d13": {
+    "__comp": "__comp---theme-doc-roota-94-67a"
+  },
+  "/truckllm/docs/-700": {
     "__comp": "__comp---theme-doc-item-178-a40",
     "content": "content---truckllm-docs-233-745"
   },
-  "/truckllm/docs/contributing-4e9": {
+  "/truckllm/docs/Contributing-18f": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-contributing-4-d-5-8af"
+    "content": "content---truckllm-docs-contributingb-26-b7c"
   },
-  "/truckllm/docs/contributing/changelog-ca8": {
+  "/truckllm/docs/Contributing/Changelog-ad2": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-contributing-changelogab-6-e62"
+    "content": "content---truckllm-docs-contributing-changelogda-8-9bf"
   },
-  "/truckllm/docs/contributing/guidelines-a79": {
+  "/truckllm/docs/Contributing/Guidelines-5a2": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-contributing-guidelines-310-287"
+    "content": "content---truckllm-docs-contributing-guidelines-6-bf-352"
   },
-  "/truckllm/docs/guides-f07": {
+  "/truckllm/docs/Guides-29e": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-guidesd-7-b-05b"
+    "content": "content---truckllm-docs-guides-395-d83"
   },
-  "/truckllm/docs/guides/configuration-855": {
+  "/truckllm/docs/Guides/Configuration-38b": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-guides-configuration-956-d7a"
+    "content": "content---truckllm-docs-guides-configurationa-93-9fa"
   },
-  "/truckllm/docs/guides/deployment-cf5": {
+  "/truckllm/docs/Guides/Deployment-836": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-guides-deploymentcaa-7a7"
+    "content": "content---truckllm-docs-guides-deploymenta-82-345"
   },
-  "/truckllm/docs/guides/providers-658": {
+  "/truckllm/docs/Guides/Providers-454": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-guides-providers-55-d-90c"
+    "content": "content---truckllm-docs-guides-providersc-73-394"
   },
-  "/truckllm/docs/intro-be5": {
+  "/truckllm/docs/Intro-99a": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-intro-0-e-3-f56"
+    "content": "content---truckllm-docs-intro-377-034"
   },
-  "/truckllm/docs/intro/architecture-6e9": {
+  "/truckllm/docs/Intro/Architecture-cde": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-intro-architecture-065-e18"
+    "content": "content---truckllm-docs-intro-architecture-153-166"
   },
-  "/truckllm/docs/intro/overview-6e8": {
+  "/truckllm/docs/Intro/Overview-34e": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-intro-overview-063-703"
+    "content": "content---truckllm-docs-intro-overview-8-a-8-983"
   },
-  "/truckllm/docs/reference-646": {
+  "/truckllm/docs/Reference-7da": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-reference-775-b62"
+    "content": "content---truckllm-docs-referenceab-9-466"
   },
-  "/truckllm/docs/reference/api-d33": {
+  "/truckllm/docs/Reference/API-21b": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-reference-apib-95-8e8"
+    "content": "content---truckllm-docs-reference-api-2-d-7-fd4"
   },
-  "/truckllm/docs/reference/balancer-df5": {
+  "/truckllm/docs/Reference/Balancer-520": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-reference-balancer-6-d-3-1ff"
+    "content": "content---truckllm-docs-reference-balancer-8-da-b3d"
   },
-  "/truckllm/docs/reference/logging-801": {
+  "/truckllm/docs/Reference/Logging-366": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-reference-logging-2-b-5-159"
+    "content": "content---truckllm-docs-reference-logginga-75-66a"
   },
-  "/truckllm/docs/reference/storage-65b": {
+  "/truckllm/docs/Reference/Storage-42d": {
     "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---truckllm-docs-reference-storage-334-4c1"
+    "content": "content---truckllm-docs-reference-storage-7-bc-883"
   }
 }

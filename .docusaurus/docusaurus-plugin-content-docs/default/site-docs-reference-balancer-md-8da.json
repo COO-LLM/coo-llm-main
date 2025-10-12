@@ -1,0 +1,24 @@
+{
+  "id": "Reference/Balancer",
+  "title": "Load Balancer",
+  "description": "---",
+  "source": "@site/docs/Reference/Balancer.md",
+  "sourceDirName": "Reference",
+  "slug": "/Reference/Balancer",
+  "permalink": "/truckllm/docs/Reference/Balancer",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/Reference/Balancer.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "API Reference",
+    "permalink": "/truckllm/docs/Reference/API"
+  },
+  "next": {
+    "title": "Storage",
+    "permalink": "/truckllm/docs/Reference/Storage"
+  }
+}

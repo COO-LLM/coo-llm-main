@@ -1,0 +1,24 @@
+{
+  "id": "Reference/Storage",
+  "title": "Storage",
+  "description": "---",
+  "source": "@site/docs/Reference/Storage.md",
+  "sourceDirName": "Reference",
+  "slug": "/Reference/Storage",
+  "permalink": "/truckllm/docs/Reference/Storage",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/Reference/Storage.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Load Balancer",
+    "permalink": "/truckllm/docs/Reference/Balancer"
+  },
+  "next": {
+    "title": "Logging",
+    "permalink": "/truckllm/docs/Reference/Logging"
+  }
+}

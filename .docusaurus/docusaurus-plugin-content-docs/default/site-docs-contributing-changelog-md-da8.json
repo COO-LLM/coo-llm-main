@@ -1,0 +1,20 @@
+{
+  "id": "Contributing/Changelog",
+  "title": "Changelog",
+  "description": "---",
+  "source": "@site/docs/Contributing/Changelog.md",
+  "sourceDirName": "Contributing",
+  "slug": "/Contributing/Changelog",
+  "permalink": "/truckllm/docs/Contributing/Changelog",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/Contributing/Changelog.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Contributing",
+    "permalink": "/truckllm/docs/Contributing/Guidelines"
+  }
+}

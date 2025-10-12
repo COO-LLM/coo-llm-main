@@ -8,8 +8,8 @@ We welcome contributions to TruckLLM! This section contains information for cont
 
 ## Getting Started
 
-- [Guidelines](contributing/guidelines.md) - Development guidelines and workflow
-- [Changelog](contributing/changelog.md) - Version history and release notes
+- [Guidelines](Contributing/Guidelines.md) - Development guidelines and workflow
+- [Changelog](Contributing/Changelog.md) - Version history and release notes
 
 ## Resources
 

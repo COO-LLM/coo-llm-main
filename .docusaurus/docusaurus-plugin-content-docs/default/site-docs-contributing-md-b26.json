@@ -1,0 +1,18 @@
+{
+  "id": "Contributing",
+  "title": "Contributing",
+  "description": "We welcome contributions to TruckLLM! This section contains information for contributors.",
+  "source": "@site/docs/Contributing.md",
+  "sourceDirName": ".",
+  "slug": "/Contributing",
+  "permalink": "/truckllm/docs/Contributing",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/Contributing.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4
+  }
+}

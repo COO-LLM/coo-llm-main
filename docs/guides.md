@@ -8,12 +8,12 @@ This section contains practical guides for using and deploying TruckLLM.
 
 ## Getting Started
 
-- [Configuration](guides/configuration.md) - Complete configuration reference
-- [Deployment](guides/deployment.md) - Installation and production deployment
-- [Providers](guides/providers.md) - Setting up LLM providers
+- [Configuration](Guides/Configuration.md) - Complete configuration reference
+- [Deployment](Guides/Deployment.md) - Installation and production deployment
+- [Providers](Guides/Providers.md) - Setting up LLM providers
 
 ## Advanced Topics
 
-- [Load Balancing](reference/balancer.md) - Understanding balancing algorithms
-- [Storage](reference/storage.md) - Configuring storage backends
-- [Logging](reference/logging.md) - Setting up monitoring and logging
+- [Load Balancing](Reference/Balancer.md) - Understanding balancing algorithms
+- [Storage](Reference/Storage.md) - Configuring storage backends
+- [Logging](Reference/Logging.md) - Setting up monitoring and logging

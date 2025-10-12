@@ -305,7 +305,7 @@ grep '"level":"error"' logs/llm.log
 
 - **File logging:** 10,000+ logs/second
 - **HTTP logging:** 1,000+ logs/second (with batching)
-- **Memory usage:** <50MB for 1M buffered logs
+- **Memory usage:** &lt;50MB for 1M buffered logs
 
 ### Asynchronous Processing
 

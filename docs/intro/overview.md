@@ -80,4 +80,4 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 
 ## Getting Started
 
-See [Deployment](deployment.md) for installation instructions and [Configuration](configuration.md) for setup details.
+See [Deployment](../Guides/Deployment.md) for installation instructions and [Configuration](../Guides/Configuration.md) for setup details.

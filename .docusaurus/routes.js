@@ -4,138 +4,145 @@ import ComponentCreator from '@docusaurus/ComponentCreator';
 export default [
   {
     path: '/truckllm/__docusaurus/debug',
-    component: ComponentCreator('/truckllm/__docusaurus/debug', '04a'),
+    component: ComponentCreator('/truckllm/__docusaurus/debug', '70d'),
     exact: true
   },
   {
     path: '/truckllm/__docusaurus/debug/config',
-    component: ComponentCreator('/truckllm/__docusaurus/debug/config', '21b'),
+    component: ComponentCreator('/truckllm/__docusaurus/debug/config', 'ec8'),
     exact: true
   },
   {
     path: '/truckllm/__docusaurus/debug/content',
-    component: ComponentCreator('/truckllm/__docusaurus/debug/content', '8d5'),
+    component: ComponentCreator('/truckllm/__docusaurus/debug/content', '8d7'),
     exact: true
   },
   {
     path: '/truckllm/__docusaurus/debug/globalData',
-    component: ComponentCreator('/truckllm/__docusaurus/debug/globalData', '96e'),
+    component: ComponentCreator('/truckllm/__docusaurus/debug/globalData', 'f75'),
     exact: true
   },
   {
     path: '/truckllm/__docusaurus/debug/metadata',
-    component: ComponentCreator('/truckllm/__docusaurus/debug/metadata', '35b'),
+    component: ComponentCreator('/truckllm/__docusaurus/debug/metadata', 'aef'),
     exact: true
   },
   {
     path: '/truckllm/__docusaurus/debug/registry',
-    component: ComponentCreator('/truckllm/__docusaurus/debug/registry', 'dc2'),
+    component: ComponentCreator('/truckllm/__docusaurus/debug/registry', 'dfa'),
     exact: true
   },
   {
     path: '/truckllm/__docusaurus/debug/routes',
-    component: ComponentCreator('/truckllm/__docusaurus/debug/routes', '99f'),
+    component: ComponentCreator('/truckllm/__docusaurus/debug/routes', 'ca0'),
     exact: true
   },
   {
     path: '/truckllm/docs',
-    component: ComponentCreator('/truckllm/docs', '180'),
+    component: ComponentCreator('/truckllm/docs', '9b5'),
     routes: [
       {
-        path: '/truckllm/docs/',
-        component: ComponentCreator('/truckllm/docs/', '27b'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/contributing',
-        component: ComponentCreator('/truckllm/docs/contributing', '4e9'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/contributing/changelog',
-        component: ComponentCreator('/truckllm/docs/contributing/changelog', 'ca8'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/contributing/guidelines',
-        component: ComponentCreator('/truckllm/docs/contributing/guidelines', 'a79'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/guides',
-        component: ComponentCreator('/truckllm/docs/guides', 'f07'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/guides/configuration',
-        component: ComponentCreator('/truckllm/docs/guides/configuration', '855'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/guides/deployment',
-        component: ComponentCreator('/truckllm/docs/guides/deployment', 'cf5'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/guides/providers',
-        component: ComponentCreator('/truckllm/docs/guides/providers', '658'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/intro',
-        component: ComponentCreator('/truckllm/docs/intro', 'be5'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/intro/architecture',
-        component: ComponentCreator('/truckllm/docs/intro/architecture', '6e9'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/intro/overview',
-        component: ComponentCreator('/truckllm/docs/intro/overview', '6e8'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/reference',
-        component: ComponentCreator('/truckllm/docs/reference', '646'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/reference/api',
-        component: ComponentCreator('/truckllm/docs/reference/api', 'd33'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/reference/balancer',
-        component: ComponentCreator('/truckllm/docs/reference/balancer', 'df5'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/reference/logging',
-        component: ComponentCreator('/truckllm/docs/reference/logging', '801'),
-        exact: true,
-        sidebar: "tutorialSidebar"
-      },
-      {
-        path: '/truckllm/docs/reference/storage',
-        component: ComponentCreator('/truckllm/docs/reference/storage', '65b'),
-        exact: true,
-        sidebar: "tutorialSidebar"
+        path: '/truckllm/docs',
+        component: ComponentCreator('/truckllm/docs', '0e8'),
+        routes: [
+          {
+            path: '/truckllm/docs',
+            component: ComponentCreator('/truckllm/docs', 'd13'),
+            routes: [
+              {
+                path: '/truckllm/docs/',
+                component: ComponentCreator('/truckllm/docs/', '700'),
+                exact: true
+              },
+              {
+                path: '/truckllm/docs/Contributing',
+                component: ComponentCreator('/truckllm/docs/Contributing', '18f'),
+                exact: true
+              },
+              {
+                path: '/truckllm/docs/Contributing/Changelog',
+                component: ComponentCreator('/truckllm/docs/Contributing/Changelog', 'ad2'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/truckllm/docs/Contributing/Guidelines',
+                component: ComponentCreator('/truckllm/docs/Contributing/Guidelines', '5a2'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/truckllm/docs/Guides',
+                component: ComponentCreator('/truckllm/docs/Guides', '29e'),
+                exact: true
+              },
+              {
+                path: '/truckllm/docs/Guides/Configuration',
+                component: ComponentCreator('/truckllm/docs/Guides/Configuration', '38b'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/truckllm/docs/Guides/Deployment',
+                component: ComponentCreator('/truckllm/docs/Guides/Deployment', '836'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/truckllm/docs/Guides/Providers',
+                component: ComponentCreator('/truckllm/docs/Guides/Providers', '454'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/truckllm/docs/Intro',
+                component: ComponentCreator('/truckllm/docs/Intro', '99a'),
+                exact: true
+              },
+              {
+                path: '/truckllm/docs/Intro/Architecture',
+                component: ComponentCreator('/truckllm/docs/Intro/Architecture', 'cde'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/truckllm/docs/Intro/Overview',
+                component: ComponentCreator('/truckllm/docs/Intro/Overview', '34e'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/truckllm/docs/Reference',
+                component: ComponentCreator('/truckllm/docs/Reference', '7da'),
+                exact: true
+              },
+              {
+                path: '/truckllm/docs/Reference/API',
+                component: ComponentCreator('/truckllm/docs/Reference/API', '21b'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/truckllm/docs/Reference/Balancer',
+                component: ComponentCreator('/truckllm/docs/Reference/Balancer', '520'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/truckllm/docs/Reference/Logging',
+                component: ComponentCreator('/truckllm/docs/Reference/Logging', '366'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              },
+              {
+                path: '/truckllm/docs/Reference/Storage',
+                component: ComponentCreator('/truckllm/docs/Reference/Storage', '42d'),
+                exact: true,
+                sidebar: "tutorialSidebar"
+              }
+            ]
+          }
+        ]
       }
     ]
   },

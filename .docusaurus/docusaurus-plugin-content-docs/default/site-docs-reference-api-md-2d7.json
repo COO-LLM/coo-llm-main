@@ -1,0 +1,24 @@
+{
+  "id": "Reference/API",
+  "title": "API Reference",
+  "description": "---",
+  "source": "@site/docs/Reference/API.md",
+  "sourceDirName": "Reference",
+  "slug": "/Reference/API",
+  "permalink": "/truckllm/docs/Reference/API",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/Reference/API.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Architecture",
+    "permalink": "/truckllm/docs/Intro/Architecture"
+  },
+  "next": {
+    "title": "Load Balancer",
+    "permalink": "/truckllm/docs/Reference/Balancer"
+  }
+}

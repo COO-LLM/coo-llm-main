@@ -1,0 +1,24 @@
+{
+  "id": "Reference/Logging",
+  "title": "Logging",
+  "description": "---",
+  "source": "@site/docs/Reference/Logging.md",
+  "sourceDirName": "Reference",
+  "slug": "/Reference/Logging",
+  "permalink": "/truckllm/docs/Reference/Logging",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/Reference/Logging.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Storage",
+    "permalink": "/truckllm/docs/Reference/Storage"
+  },
+  "next": {
+    "title": "Contributing",
+    "permalink": "/truckllm/docs/Contributing/Guidelines"
+  }
+}

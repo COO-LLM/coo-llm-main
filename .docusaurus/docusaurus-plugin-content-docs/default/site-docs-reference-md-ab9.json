@@ -1,0 +1,18 @@
+{
+  "id": "Reference",
+  "title": "Reference",
+  "description": "This section contains detailed technical reference documentation.",
+  "source": "@site/docs/Reference.md",
+  "sourceDirName": ".",
+  "slug": "/Reference",
+  "permalink": "/truckllm/docs/Reference",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/Reference.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "sidebar_position": 3
+  }
+}

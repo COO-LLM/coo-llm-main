@@ -243,7 +243,7 @@ Configuration is centralized in YAML format with support for:
 - Validation and defaults
 - Hierarchical overrides
 
-See [Configuration](configuration.md) for details.
+See [Configuration](../Guides/Configuration.md) for details.
 
 ## Security Considerations
 

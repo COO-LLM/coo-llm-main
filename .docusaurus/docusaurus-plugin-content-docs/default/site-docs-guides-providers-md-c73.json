@@ -1,0 +1,24 @@
+{
+  "id": "Guides/Providers",
+  "title": "Providers",
+  "description": "---",
+  "source": "@site/docs/Guides/Providers.md",
+  "sourceDirName": "Guides",
+  "slug": "/Guides/Providers",
+  "permalink": "/truckllm/docs/Guides/Providers",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/Guides/Providers.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Deployment",
+    "permalink": "/truckllm/docs/Guides/Deployment"
+  },
+  "next": {
+    "title": "Architecture",
+    "permalink": "/truckllm/docs/Intro/Architecture"
+  }
+}
