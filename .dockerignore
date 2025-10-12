@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests
+*_test.go
+test/
+
+# CI/CD
+.github/
+
+# Development files
+Makefile
+docker-compose.yml
+docusaurus.config.js
+package.json
+sidebars.js
+project-info.md
+structure.md
+
+# Binaries
+truckllm
+bin/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
