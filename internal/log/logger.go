@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/user/truckllm/internal/config"
+	"github.com/user/coo-llm/internal/config"
 )
 
 type Logger struct {

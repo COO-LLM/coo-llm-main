@@ -1,7 +1,7 @@
 package store
 
 import (
-	"github.com/user/truckllm/internal/config"
+	"github.com/user/coo-llm/internal/config"
 )
 
 type FileStore struct {

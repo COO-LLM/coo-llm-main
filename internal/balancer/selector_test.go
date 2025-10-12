@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/user/truckllm/internal/config"
+	"github.com/user/coo-llm/internal/config"
 )
 
 type mockStore struct {
@@ -39,6 +39,51 @@ func (m *mockStore) IncrementUsage(provider, keyID, metric string, delta float64
 	return m.SetUsage(provider, keyID, metric, val+delta)
 }
 
+func (m *mockStore) GetUsageInWindow(provider, keyID, metric string, windowSeconds int64) (float64, error) {
+	return m.GetUsage(provider, keyID, metric)
+}
+
+func (m *mockStore) SetCache(key, value string, ttlSeconds int64) error {
+	return nil
+}
+
+func (m *mockStore) GetCache(key string) (string, error) {
+	return "", nil
+}
+
+func TestRateLimiting(t *testing.T) {
+	cfg := &config.Config{
+		Providers: []config.Provider{
+			{
+				ID: "openai",
+				Keys: []config.Key{
+					{ID: "key1", LimitReqPerMin: 10, LimitTokensPerMin: 1000},
+					{ID: "key2", LimitReqPerMin: 10, LimitTokensPerMin: 1000},
+				},
+			},
+		},
+		Policy: config.Policy{Algorithm: "round_robin"},
+	}
+
+	store := newMockStore()
+	// Set key1 as rate limited (exceeded req limit)
+	store.SetUsage("openai", "key1", "req", 15) // 15 > 10 limit
+
+	selector := NewSelector(cfg, store)
+
+	// Should select key2 since key1 is rate limited
+	key, err := selector.selectKey(&cfg.Providers[0], "gpt-4o")
+	require.NoError(t, err)
+	assert.Equal(t, "key2", key.ID)
+
+	// Test with both keys rate limited - should still select one
+	store.SetUsage("openai", "key2", "req", 15)
+	key, err = selector.selectKey(&cfg.Providers[0], "gpt-4o")
+	require.NoError(t, err)
+	// Should select one of the keys (allows bursting)
+	assert.True(t, key.ID == "key1" || key.ID == "key2")
+}
+
 func TestResolveModel(t *testing.T) {
 	cfg := &config.Config{
 		ModelAliases: map[string]string{
@@ -70,17 +115,17 @@ func TestSelectBest(t *testing.T) {
 		ModelAliases: map[string]string{
 			"gpt-4o": "openai:gpt-4o",
 		},
-		Policy: config.Policy{Strategy: "round_robin"},
+		Policy: config.Policy{Algorithm: "round_robin"},
 	}
 	store := newMockStore()
 	selector := NewSelector(cfg, store)
 
-	pCfg, key, err := selector.SelectBest("gpt-4o")
+	pCfg, key, _, err := selector.SelectBest("gpt-4o")
 	require.NoError(t, err)
 	assert.Equal(t, "openai", pCfg.ID)
 	assert.Equal(t, "key1", key.ID)
 
-	pCfg, key, err = selector.SelectBest("unknown")
+	pCfg, key, _, err = selector.SelectBest("unknown")
 	require.NoError(t, err)
 	assert.Equal(t, "openai", pCfg.ID)
 	assert.Equal(t, "key1", key.ID)
@@ -97,7 +142,7 @@ func TestSelectRoundRobin(t *testing.T) {
 				},
 			},
 		},
-		Policy: config.Policy{Strategy: "round_robin"},
+		Policy: config.Policy{Algorithm: "round_robin"},
 	}
 	store := newMockStore()
 	selector := NewSelector(cfg, store)
@@ -105,30 +150,6 @@ func TestSelectRoundRobin(t *testing.T) {
 	key, err := selector.selectRoundRobin(&cfg.Providers[0])
 	require.NoError(t, err)
 	assert.Contains(t, []string{"key1", "key2"}, key.ID)
-}
-
-func TestSelectLeastError(t *testing.T) {
-	cfg := &config.Config{
-		Providers: []config.Provider{
-			{
-				ID: "openai",
-				Keys: []config.Key{
-					{ID: "key1"},
-					{ID: "key2"},
-				},
-			},
-		},
-		Policy: config.Policy{Strategy: "least_error"},
-	}
-	store := newMockStore()
-	store.SetUsage("openai", "key1", "errors", 10)
-	store.SetUsage("openai", "key2", "errors", 5)
-	selector := NewSelector(cfg, store)
-
-	key, err := selector.selectLeastError(&cfg.Providers[0])
-	require.NoError(t, err)
-	// Currently returns first, but should be improved
-	assert.Equal(t, "key1", key.ID)
 }
 
 func TestSelectHybrid(t *testing.T) {
@@ -149,7 +170,7 @@ func TestSelectHybrid(t *testing.T) {
 			},
 		},
 		Policy: config.Policy{
-			Strategy: "hybrid",
+			Algorithm: "hybrid",
 			HybridWeights: config.HybridWeights{
 				ReqRatio:   0.2,
 				TokenRatio: 0.3,

@@ -1,10 +1,16 @@
-name: CI
+name: CI/CD
 
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ github.repository }}
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
   test:
@@ -32,5 +38,116 @@ jobs:
     - name: Run tests
       run: go test ./...
 
+    - name: Run go vet
+      run: go vet ./...
+
     - name: Build
-      run: go build ./cmd/truckllm
+      run: go build ./cmd/coo-llm
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=tag
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [test, build-and-push]
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Get version
+      id: get_version
+      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ steps.get_version.outputs.version }}
+        body: |
+          ## What's Changed
+
+          ### Docker Images
+          - `docker pull ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}:${{ steps.get_version.outputs.version }}`
+          - `docker pull ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}:latest`
+
+          ### Installation
+          ```bash
+          # Use Docker
+          docker run -p 8080:8080 \
+            -e OPENAI_API_KEY="your-key" \
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}:${{ steps.get_version.outputs.version }}
+          ```
+
+          For more information, see the [documentation](https://coo-llm.dev).
+        draft: false
+        prerelease: false
+
+  docs:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+     - name: Setup Node.js
+       uses: actions/setup-node@v4
+       with:
+         node-version: '18'
+         cache: 'npm'
+         cache-dependency-path: docs/package-lock.json
+
+     - name: Install dependencies
+       run: cd docs && npm ci
+
+     - name: Build docs
+       run: cd docs && npm run build
+
+     - name: Deploy to GitHub Pages
+       if: github.ref == 'refs/heads/main'
+       uses: peaceiris/actions-gh-pages@v3
+       with:
+         github_token: ${{ secrets.GITHUB_TOKEN }}
+         publish_dir: ./docs/build
+         cname: coo-llm.dev

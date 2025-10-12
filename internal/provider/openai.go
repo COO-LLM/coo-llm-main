@@ -1,81 +1,96 @@
 package provider
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
 
-	"github.com/user/truckllm/internal/config"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 type OpenAIProvider struct {
-	cfg *config.Provider
+	cfg    LLMConfig
+	client *openai.Client
 }
 
-func NewOpenAIProvider(cfg *config.Provider) *OpenAIProvider {
-	return &OpenAIProvider{cfg: cfg}
+func NewOpenAIProvider(cfg LLMConfig) *OpenAIProvider {
+	config := openai.DefaultConfig(cfg.APIKey())
+	if cfg.BaseURL != "" {
+		config.BaseURL = cfg.BaseURL
+	}
+	client := openai.NewClientWithConfig(config)
+	return &OpenAIProvider{cfg: cfg, client: client}
 }
 
 func (p *OpenAIProvider) Name() string {
-	return p.cfg.ID
+	return string(ProviderOpenAI)
 }
 
-func (p *OpenAIProvider) Generate(ctx context.Context, req *Request) (*Response, error) {
-	apiKey := req.APIKey
-	if apiKey == "" {
-		return nil, fmt.Errorf("no API key provided for provider %s", p.Name())
-	}
+func (p *OpenAIProvider) Generate(ctx context.Context, req *LLMRequest) (*LLMResponse, error) {
+	// Convert messages to OpenAI format
+	var messages []openai.ChatCompletionMessage
+	if len(req.Messages) > 0 {
+		messages = make([]openai.ChatCompletionMessage, len(req.Messages))
+		for i, msg := range req.Messages {
+			role, _ := msg["role"].(string)
+			content, _ := msg["content"].(string)
 
-	url := p.cfg.BaseURL + "/v1/chat/completions" // Assuming chat completions for now
-
-	reqBody, err := json.Marshal(req.Input)
-	if err != nil {
-		return nil, err
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, err
-	}
-	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	start := time.Now()
-	resp, err := client.Do(httpReq)
-	latency := time.Since(start).Milliseconds()
-
-	if err != nil {
-		return &Response{Err: err, Latency: latency}, nil
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return &Response{Err: err, Latency: latency}, nil
-	}
-
-	tokensUsed := 0
-	if resp.StatusCode == 200 {
-		var jsonResp map[string]any
-		if err := json.Unmarshal(body, &jsonResp); err == nil {
-			if usage, ok := jsonResp["usage"].(map[string]any); ok {
-				if total, ok := usage["total_tokens"].(float64); ok {
-					tokensUsed = int(total)
-				}
+			var openaiRole string
+			switch role {
+			case "user":
+				openaiRole = openai.ChatMessageRoleUser
+			case "assistant":
+				openaiRole = openai.ChatMessageRoleAssistant
+			case "system":
+				openaiRole = openai.ChatMessageRoleSystem
+			default:
+				openaiRole = openai.ChatMessageRoleUser
 			}
+
+			messages[i] = openai.ChatCompletionMessage{
+				Role:    openaiRole,
+				Content: content,
+			}
+		}
+	} else {
+		// Fallback to single message
+		messages = []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleUser, Content: req.Prompt},
 		}
 	}
 
-	return &Response{
-		RawResponse: body,
-		HTTPCode:    resp.StatusCode,
-		Latency:     latency,
-		TokensUsed:  tokensUsed,
+	modelName := p.cfg.Model
+	if req.Model != "" {
+		modelName = req.Model
+	}
+	chatReq := openai.ChatCompletionRequest{
+		Model:     modelName,
+		Messages:  messages,
+		MaxTokens: req.MaxTokens,
+	}
+
+	// Add custom params
+	if temp, ok := req.Params["temperature"].(float64); ok {
+		chatReq.Temperature = float32(temp)
+	}
+	if topP, ok := req.Params["top_p"].(float64); ok {
+		chatReq.TopP = float32(topP)
+	}
+
+	resp, err := p.client.CreateChatCompletion(ctx, chatReq)
+	if err != nil {
+		return nil, fmt.Errorf("OpenAI API error: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from OpenAI")
+	}
+
+	return &LLMResponse{
+		Text:         resp.Choices[0].Message.Content,
+		InputTokens:  resp.Usage.PromptTokens,
+		OutputTokens: resp.Usage.CompletionTokens,
+		TokensUsed:   resp.Usage.TotalTokens,
+		FinishReason: string(resp.Choices[0].FinishReason),
 	}, nil
 }
 

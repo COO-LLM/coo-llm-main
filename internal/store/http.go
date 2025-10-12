@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/user/truckllm/internal/config"
+	"github.com/user/coo-llm/internal/config"
 )
 
 type HTTPStore struct {
@@ -96,6 +96,21 @@ func (h *HTTPStore) IncrementUsage(provider, keyID, metric string, delta float64
 		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func (h *HTTPStore) GetUsageInWindow(provider, keyID, metric string, windowSeconds int64) (float64, error) {
+	// TODO: implement HTTP window query
+	return h.GetUsage(provider, keyID, metric)
+}
+
+func (h *HTTPStore) SetCache(key, value string, ttlSeconds int64) error {
+	// TODO: implement HTTP cache
+	return nil
+}
+
+func (h *HTTPStore) GetCache(key string) (string, error) {
+	// TODO: implement HTTP cache get
+	return "", nil
 }
 
 func (h *HTTPStore) LoadConfig() (*config.Config, error) {

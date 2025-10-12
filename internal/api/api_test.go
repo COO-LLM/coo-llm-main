@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,10 +12,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/user/truckllm/internal/balancer"
-	"github.com/user/truckllm/internal/config"
-	"github.com/user/truckllm/internal/log"
-	"github.com/user/truckllm/internal/provider"
+	"github.com/user/coo-llm/internal/balancer"
+	"github.com/user/coo-llm/internal/config"
+	"github.com/user/coo-llm/internal/log"
+	"github.com/user/coo-llm/internal/provider"
 )
 
 func TestModelsEndpoint(t *testing.T) {
@@ -28,6 +29,7 @@ func TestModelsEndpoint(t *testing.T) {
 	SetupModelsRoute(r, cfg)
 
 	req := httptest.NewRequest("GET", "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)
@@ -46,17 +48,22 @@ func TestModelsEndpoint(t *testing.T) {
 func TestChatCompletionsEndpoint(t *testing.T) {
 	// Mock config and components
 	cfg := &config.Config{
-		Providers: []config.Provider{
+		LLMProviders: []config.LLMProvider{
 			{
-				ID:      "openai",
+				ID:      "openai-prod",
+				Type:    "openai",
 				BaseURL: "https://api.openai.com/v1",
-				Keys: []config.Key{
-					{ID: "key1", Secret: "sk-test"},
-				},
+				APIKeys: []string{"sk-test"},
+			},
+		},
+		APIKeys: []config.APIKeyConfig{
+			{
+				Key:              "test-key",
+				AllowedProviders: []string{"*"},
 			},
 		},
 		ModelAliases: map[string]string{
-			"gpt-4o": "openai:gpt-4o",
+			"gpt-4o": "openai-prod:gpt-4o",
 		},
 		Policy: config.Policy{Strategy: "round_robin"},
 	}
@@ -81,6 +88,7 @@ func TestChatCompletionsEndpoint(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-key")
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)
@@ -95,12 +103,17 @@ func TestChatCompletionsEndpoint(t *testing.T) {
 
 func TestChatCompletionsEndpoint_InvalidModel(t *testing.T) {
 	cfg := &config.Config{
-		Providers: []config.Provider{
+		LLMProviders: []config.LLMProvider{
 			{
-				ID: "openai",
-				Keys: []config.Key{
-					{ID: "key1", Secret: "sk-test"},
-				},
+				ID:      "openai-prod",
+				Type:    "openai",
+				APIKeys: []string{"sk-test"},
+			},
+		},
+		APIKeys: []config.APIKeyConfig{
+			{
+				Key:              "test-key",
+				AllowedProviders: []string{"*"},
 			},
 		},
 		Policy: config.Policy{Strategy: "round_robin"},
@@ -125,6 +138,7 @@ func TestChatCompletionsEndpoint_InvalidModel(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-key")
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)
@@ -139,6 +153,7 @@ func TestModelsEndpoint_EmptyConfig(t *testing.T) {
 	SetupModelsRoute(r, cfg)
 
 	req := httptest.NewRequest("GET", "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)
@@ -153,14 +168,234 @@ func TestModelsEndpoint_EmptyConfig(t *testing.T) {
 	assert.Len(t, data, 0)
 }
 
-type mockProvider struct{}
+func TestChatCompletionsEndpoint_RetryOnFailure(t *testing.T) {
+	// Mock config with retry enabled
+	cfg := &config.Config{
+		LLMProviders: []config.LLMProvider{
+			{
+				ID:      "openai-prod",
+				Type:    "openai",
+				BaseURL: "https://api.openai.com/v1",
+				APIKeys: []string{"sk-test"},
+			},
+		},
+		APIKeys: []config.APIKeyConfig{
+			{
+				Key:              "test-key",
+				AllowedProviders: []string{"*"},
+			},
+		},
+		ModelAliases: map[string]string{
+			"gpt-4o": "openai-prod:gpt-4o",
+		},
+		Policy: config.Policy{
+			Strategy: "round_robin",
+			Retry: config.RetryConfig{
+				MaxAttempts: 3,
+				Timeout:     1000000000, // 1 second in nanoseconds
+				Interval:    100000000,  // 0.1 second in nanoseconds
+			},
+		},
+	}
 
-func (m *mockProvider) Name() string { return "openai" }
-func (m *mockProvider) Generate(ctx context.Context, req *provider.Request) (*provider.Response, error) {
-	return &provider.Response{
-		RawResponse: []byte(`{"choices":[{"message":{"content":"Hello back"}}]}`),
-		HTTPCode:    200,
-		Latency:     100,
+	reg := provider.NewRegistry()
+	reg.Register(&mockProviderWithRetry{})
+
+	runtimeStore := &mockStore{}
+	selector := balancer.NewSelector(cfg, runtimeStore)
+	logger := log.NewLogger(&config.Logging{})
+
+	r := chi.NewRouter()
+	SetupRoutes(r, selector, logger, reg, cfg)
+
+	reqBody := map[string]any{
+		"model": "gpt-4o",
+		"messages": []map[string]string{
+			{"role": "user", "content": "Hello"},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-key")
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Contains(t, resp, "choices")
+}
+
+func TestChatCompletionsEndpoint_Caching(t *testing.T) {
+	// Mock config with caching enabled
+	cfg := &config.Config{
+		LLMProviders: []config.LLMProvider{
+			{
+				ID:      "openai-prod",
+				Type:    "openai",
+				BaseURL: "https://api.openai.com/v1",
+				APIKeys: []string{"sk-test"},
+			},
+		},
+		APIKeys: []config.APIKeyConfig{
+			{
+				Key:              "test-key",
+				AllowedProviders: []string{"*"},
+			},
+		},
+		ModelAliases: map[string]string{
+			"gpt-4o": "openai-prod:gpt-4o",
+		},
+		Policy: config.Policy{
+			Strategy: "round_robin",
+			Cache: config.CacheConfig{
+				Enabled:    true,
+				TTLSeconds: 10,
+			},
+		},
+	}
+
+	reg := provider.NewRegistry()
+	mockProv := &mockProvider{callCount: 0}
+	reg.Register(mockProv)
+
+	runtimeStore := &mockStoreWithCache{cache: make(map[string]string)}
+	selector := balancer.NewSelector(cfg, runtimeStore)
+	logger := log.NewLogger(&config.Logging{})
+
+	r := chi.NewRouter()
+	SetupRoutes(r, selector, logger, reg, cfg)
+
+	reqBody := map[string]any{
+		"model": "gpt-4o",
+		"messages": []map[string]string{
+			{"role": "user", "content": "Test caching"},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+
+	// First request - should call provider
+	req1 := httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewReader(body))
+	req1.Header.Set("Content-Type", "application/json")
+	req1.Header.Set("Authorization", "Bearer test-key")
+	w1 := httptest.NewRecorder()
+
+	r.ServeHTTP(w1, req1)
+	assert.Equal(t, http.StatusOK, w1.Code)
+
+	// Check that provider was called once
+	assert.Equal(t, 1, mockProv.callCount)
+
+	// Second request with same content - should use cache
+	req2 := httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewReader(body))
+	req2.Header.Set("Content-Type", "application/json")
+	req2.Header.Set("Authorization", "Bearer test-key")
+	w2 := httptest.NewRecorder()
+
+	r.ServeHTTP(w2, req2)
+	assert.Equal(t, http.StatusOK, w2.Code)
+
+	// Check that provider was not called again (cache hit)
+	assert.Equal(t, 1, mockProv.callCount)
+
+	// Verify cache was set
+	cacheKey := "testcaching" // normalized
+	cached, exists := runtimeStore.cache[cacheKey]
+	assert.True(t, exists)
+	assert.NotEmpty(t, cached)
+
+	// Verify second response has cache_hit flag
+	var resp2 map[string]interface{}
+	err := json.Unmarshal(w2.Body.Bytes(), &resp2)
+	require.NoError(t, err)
+	assert.Equal(t, true, resp2["cache_hit"])
+}
+
+func TestChatCompletionsEndpoint_ConversationHistory(t *testing.T) {
+	cfg := &config.Config{
+		LLMProviders: []config.LLMProvider{
+			{
+				ID:      "openai-prod",
+				Type:    "openai",
+				BaseURL: "https://api.openai.com/v1",
+				APIKeys: []string{"sk-test"},
+			},
+		},
+		APIKeys: []config.APIKeyConfig{
+			{
+				Key:              "test-key",
+				AllowedProviders: []string{"*"},
+			},
+		},
+		ModelAliases: map[string]string{
+			"gpt-4o": "openai-prod:gpt-4o",
+		},
+		Policy: config.Policy{Strategy: "round_robin"},
+	}
+
+	reg := provider.NewRegistry()
+	mockProv := &mockProviderWithMessages{}
+	reg.Register(mockProv)
+
+	runtimeStore := &mockStore{}
+	selector := balancer.NewSelector(cfg, runtimeStore)
+	logger := log.NewLogger(&config.Logging{})
+
+	r := chi.NewRouter()
+	SetupRoutes(r, selector, logger, reg, cfg)
+
+	reqBody := map[string]any{
+		"model": "gpt-4o",
+		"messages": []map[string]interface{}{
+			{"role": "user", "content": "Hello, how are you?"},
+			{"role": "assistant", "content": "You are me"},
+			{"role": "user", "content": "Oh, my god"},
+		},
+		"max_tokens":  100,
+		"temperature": 0.7,
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-key")
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Contains(t, resp, "choices")
+
+	// Verify that the provider received the messages
+	assert.True(t, mockProv.receivedMessages)
+	assert.Equal(t, 3, len(mockProv.messages))
+	assert.Equal(t, "Hello, how are you?", mockProv.messages[0]["content"])
+	assert.Equal(t, "You are me", mockProv.messages[1]["content"])
+	assert.Equal(t, "Oh, my god", mockProv.messages[2]["content"])
+}
+
+type mockProvider struct {
+	callCount int
+}
+
+func (m *mockProvider) Name() string { return "openai-prod" }
+func (m *mockProvider) Generate(ctx context.Context, req *provider.LLMRequest) (*provider.LLMResponse, error) {
+	m.callCount++
+	return &provider.LLMResponse{
+		Text:         "Hello back",
+		TokensUsed:   10,
+		InputTokens:  5,
+		OutputTokens: 5,
+		FinishReason: "stop",
 	}, nil
 }
 func (m *mockProvider) ListModels(ctx context.Context) ([]string, error) {
@@ -172,3 +407,76 @@ type mockStore struct{}
 func (m *mockStore) GetUsage(provider, keyID, metric string) (float64, error)           { return 0, nil }
 func (m *mockStore) SetUsage(provider, keyID, metric string, value float64) error       { return nil }
 func (m *mockStore) IncrementUsage(provider, keyID, metric string, delta float64) error { return nil }
+func (m *mockStore) GetUsageInWindow(provider, keyID, metric string, windowSeconds int64) (float64, error) {
+	return 0, nil
+}
+func (m *mockStore) SetCache(key, value string, ttlSeconds int64) error { return nil }
+func (m *mockStore) GetCache(key string) (string, error)                { return "", nil }
+
+type mockProviderWithRetry struct {
+	callCount int
+}
+
+func (m *mockProviderWithRetry) Name() string { return "openai-prod" }
+func (m *mockProviderWithRetry) Generate(ctx context.Context, req *provider.LLMRequest) (*provider.LLMResponse, error) {
+	m.callCount++
+	if m.callCount < 3 {
+		return nil, errors.New("provider unavailable") // Fail first two attempts
+	}
+	return &provider.LLMResponse{
+		Text:         "Hello back after retry",
+		TokensUsed:   10,
+		InputTokens:  5,
+		OutputTokens: 5,
+		FinishReason: "stop",
+	}, nil
+}
+func (m *mockProviderWithRetry) ListModels(ctx context.Context) ([]string, error) {
+	return []string{"gpt-4o"}, nil
+}
+
+type mockStoreWithCache struct {
+	cache map[string]string
+}
+
+func (m *mockStoreWithCache) GetUsage(provider, keyID, metric string) (float64, error) { return 0, nil }
+func (m *mockStoreWithCache) SetUsage(provider, keyID, metric string, value float64) error {
+	return nil
+}
+func (m *mockStoreWithCache) IncrementUsage(provider, keyID, metric string, delta float64) error {
+	return nil
+}
+func (m *mockStoreWithCache) GetUsageInWindow(provider, keyID, metric string, windowSeconds int64) (float64, error) {
+	return 0, nil
+}
+func (m *mockStoreWithCache) SetCache(key, value string, ttlSeconds int64) error {
+	m.cache[key] = value
+	return nil
+}
+func (m *mockStoreWithCache) GetCache(key string) (string, error) {
+	if val, ok := m.cache[key]; ok {
+		return val, nil
+	}
+	return "", nil
+}
+
+type mockProviderWithMessages struct {
+	receivedMessages bool
+	messages         []map[string]interface{}
+}
+
+func (m *mockProviderWithMessages) Name() string { return "openai-prod" }
+func (m *mockProviderWithMessages) Generate(ctx context.Context, req *provider.LLMRequest) (*provider.LLMResponse, error) {
+	m.receivedMessages = true
+	m.messages = req.Messages
+	return &provider.LLMResponse{
+		Text:         "Response to conversation",
+		TokensUsed:   15,
+		InputTokens:  10,
+		OutputTokens: 5,
+		FinishReason: "stop",
+	}, nil
+}
+func (m *mockProviderWithMessages) ListModels(ctx context.Context) ([]string, error) {
+	return []string{"gpt-4o"}, nil
+}

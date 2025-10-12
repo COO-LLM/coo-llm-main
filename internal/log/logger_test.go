@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/user/truckllm/internal/config"
+	"github.com/user/coo-llm/internal/config"
 )
 
 func TestNewLogger(t *testing.T) {

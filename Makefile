@@ -1,11 +1,11 @@
 build:
-	go build -o bin/truckllm ./cmd/truckllm
+	go build -o bin/coo-llm ./cmd/coo-llm
 
 run:
-	./bin/truckllm -config configs/config.yaml
+	./bin/coo-llm -config configs/config.yaml
 
 docker:
-	docker build -t truckllm:latest .
+	docker build -t coo-llm:latest .
 
 test:
 	go test ./...

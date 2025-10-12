@@ -1,21 +1,46 @@
 package config
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
+
+type APIKeyConfig struct {
+	Key              string   `yaml:"key" mapstructure:"key"`
+	AllowedProviders []string `yaml:"allowed_providers" mapstructure:"allowed_providers"` // ["openai", "gemini", "*"] - "*" means all
+	Description      string   `yaml:"description,omitempty" mapstructure:"description,omitempty"`
+}
 
 type Config struct {
 	Version      string            `yaml:"version" mapstructure:"version"`
 	Server       Server            `yaml:"server" mapstructure:"server"`
 	Logging      Logging           `yaml:"logging" mapstructure:"logging"`
 	Storage      Storage           `yaml:"storage" mapstructure:"storage"`
-	Providers    []Provider        `yaml:"providers" mapstructure:"providers"`
+	LLMProviders []LLMProvider     `yaml:"llm_providers" mapstructure:"llm_providers"`
+	Providers    []Provider        `yaml:"providers" mapstructure:"providers"` // Legacy
+	APIKeys      []APIKeyConfig    `yaml:"api_keys" mapstructure:"api_keys"`
 	ModelAliases map[string]string `yaml:"model_aliases" mapstructure:"model_aliases"`
 	Policy       Policy            `yaml:"policy" mapstructure:"policy"`
+}
+
+type LLMProvider struct {
+	ID      string   `yaml:"id" mapstructure:"id"`
+	Type    string   `yaml:"type" mapstructure:"type"`
+	APIKeys []string `yaml:"api_keys" mapstructure:"api_keys"`
+	BaseURL string   `yaml:"base_url,omitempty" mapstructure:"base_url,omitempty"`
+	Model   string   `yaml:"model" mapstructure:"model"`
+	Pricing Pricing  `yaml:"pricing" mapstructure:"pricing"`
+	Limits  Limits   `yaml:"limits" mapstructure:"limits"`
+}
+
+type Limits struct {
+	ReqPerMin    int `yaml:"req_per_min" mapstructure:"req_per_min"`
+	TokensPerMin int `yaml:"tokens_per_min" mapstructure:"tokens_per_min"`
 }
 
 type Server struct {
@@ -88,15 +113,28 @@ type Key struct {
 }
 
 type Pricing struct {
-	InputTokenCost  float64 `yaml:"input_token_cost" mapstructure:"input_token_cost"`   // per 1K tokens
-	OutputTokenCost float64 `yaml:"output_token_cost" mapstructure:"output_token_cost"` // per 1K tokens
-	Currency        string  `yaml:"currency" mapstructure:"currency"`
+	InputTokenCost  float64 `yaml:"input_token_cost" mapstructure:"input_token_cost"`
+	OutputTokenCost float64 `yaml:"output_token_cost" mapstructure:"output_token_cost"`
 }
 
 type Policy struct {
 	Strategy      string        `yaml:"strategy" mapstructure:"strategy"`
+	Algorithm     string        `yaml:"algorithm" mapstructure:"algorithm"` // "round_robin", "least_loaded", "hybrid"
+	Priority      string        `yaml:"priority" mapstructure:"priority"`   // "balanced", "cost", "req", "token"
 	HybridWeights HybridWeights `yaml:"hybrid_weights" mapstructure:"hybrid_weights"`
-	CostFirst     bool          `yaml:"cost_first" mapstructure:"cost_first"`
+	Retry         RetryConfig   `yaml:"retry" mapstructure:"retry"`
+	Cache         CacheConfig   `yaml:"cache" mapstructure:"cache"`
+}
+
+type CacheConfig struct {
+	Enabled    bool  `yaml:"enabled" mapstructure:"enabled"`
+	TTLSeconds int64 `yaml:"ttl_seconds" mapstructure:"ttl_seconds"` // Cache TTL
+}
+
+type RetryConfig struct {
+	MaxAttempts int           `yaml:"max_attempts" mapstructure:"max_attempts"` // Max retry attempts
+	Timeout     time.Duration `yaml:"timeout" mapstructure:"timeout"`           // Timeout per attempt
+	Interval    time.Duration `yaml:"interval" mapstructure:"interval"`         // Interval between retries
 }
 
 type HybridWeights struct {
@@ -124,6 +162,55 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Set weights based on priority
+	if cfg.Policy.Priority != "" {
+		switch cfg.Policy.Priority {
+		case "cost":
+			cfg.Policy.HybridWeights = HybridWeights{
+				TokenRatio: 0.1, ReqRatio: 0.1, ErrorScore: 0.2, Latency: 0.1, CostRatio: 0.5,
+			}
+		case "req":
+			cfg.Policy.HybridWeights = HybridWeights{
+				TokenRatio: 0.1, ReqRatio: 0.5, ErrorScore: 0.2, Latency: 0.1, CostRatio: 0.1,
+			}
+		case "token":
+			cfg.Policy.HybridWeights = HybridWeights{
+				TokenRatio: 0.5, ReqRatio: 0.1, ErrorScore: 0.2, Latency: 0.1, CostRatio: 0.1,
+			}
+		case "balanced":
+			fallthrough
+		default:
+			cfg.Policy.HybridWeights = HybridWeights{
+				TokenRatio: 0.2, ReqRatio: 0.2, ErrorScore: 0.2, Latency: 0.2, CostRatio: 0.2,
+			}
+		}
+	}
+
+	// Convert LLMProviders to legacy Providers for backward compatibility
+	if len(cfg.Providers) == 0 && len(cfg.LLMProviders) > 0 {
+		for _, lp := range cfg.LLMProviders {
+			keys := make([]Key, len(lp.APIKeys))
+			for i, apiKey := range lp.APIKeys {
+				// Use hash of API key as stable ID for consistency
+				h := sha256.Sum256([]byte(apiKey))
+				keyID := fmt.Sprintf("%s-%x", lp.Type, h[:8])
+				keys[i] = Key{
+					ID:                keyID,
+					Secret:            apiKey,
+					LimitReqPerMin:    lp.Limits.ReqPerMin,
+					LimitTokensPerMin: lp.Limits.TokensPerMin,
+					Pricing:           lp.Pricing,
+				}
+			}
+			cfg.Providers = append(cfg.Providers, Provider{
+				ID:      lp.Type,
+				Name:    lp.Type,
+				BaseURL: lp.BaseURL,
+				Keys:    keys,
+			})
+		}
+	}
+
 	return &cfg, nil
 }
 
@@ -134,7 +221,7 @@ func ValidateConfig(cfg *Config) error {
 	if cfg.Server.Listen == "" {
 		return fmt.Errorf("server.listen is required")
 	}
-	if len(cfg.Providers) == 0 {
+	if len(cfg.LLMProviders) == 0 && len(cfg.Providers) == 0 {
 		return fmt.Errorf("at least one provider is required")
 	}
 	// Add more validations as needed

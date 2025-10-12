@@ -1,7 +1,7 @@
 version: "1.0"
 
 server:
-  listen: ":8080"
+  listen: ":8081"
   admin_api_key: "admin-secret"
 
 logging:
@@ -20,59 +20,94 @@ storage:
     type: "file"
     path: "./configs/config.yaml"
   runtime:
-    type: "redis"
+    type: "redis"  # Redis for production (persistent storage, rate limiting)
     addr: "localhost:6379"
-    password: ""
+    password: ""  # Set password if Redis requires authentication
 
-providers:
-  - id: "openai"
-    name: "OpenAI"
-    base_url: "https://api.openai.com/v1"
-    keys:
-      - id: "oa-1"
-        secret: "${OPENAI_KEY_1}"
-        limit_req_per_min: 200
-        limit_tokens_per_min: 100000
-        pricing:
-          input_token_cost: 0.002
-          output_token_cost: 0.01
-          currency: "USD"
-  - id: "gemini"
-    name: "Gemini"
-    base_url: "https://generativelanguage.googleapis.com/v1"
-    keys:
-      - id: "gm-1"
-        secret: "${GEMINI_KEY_1}"
-        limit_req_per_min: 150
-        limit_tokens_per_min: 80000
-        pricing:
-          input_token_cost: 0.00025
-          output_token_cost: 0.0005
-          currency: "USD"
-  - id: "claude"
-    name: "Claude"
-    base_url: "https://api.anthropic.com/v1"
-    keys:
-      - id: "cl-1"
-        secret: "${CLAUDE_KEY_1}"
-        limit_req_per_min: 100
-        limit_tokens_per_min: 60000
-        pricing:
-          input_token_cost: 0.015
-          output_token_cost: 0.075
-          currency: "USD"
+llm_providers:
+  - id: "openai-prod"
+    type: "openai"
+    api_keys: ["${OPENAI_KEY_1}", "${OPENAI_KEY_2}"]
+    base_url: "https://api.openai.com"
+    model: "gpt-4o"
+    pricing:
+      input_token_cost: 0.002
+      output_token_cost: 0.01
+    limits:
+      req_per_min: 200
+      tokens_per_min: 100000
+  - id: "gemini-prod"
+    type: "gemini"
+    api_keys: ["${GEMINI_KEY_1}"]
+    base_url: "https://generativelanguage.googleapis.com"
+    model: "gemini-1.5-pro"
+    pricing:
+      input_token_cost: 0.00025
+      output_token_cost: 0.0005
+    limits:
+      req_per_min: 150
+      tokens_per_min: 80000
+  - id: "claude-prod"
+    type: "claude"
+    api_keys: ["${CLAUDE_KEY_1}"]
+    base_url: "https://api.anthropic.com"
+    model: "claude-3-opus"
+    pricing:
+      input_token_cost: 0.015
+      output_token_cost: 0.075
+    limits:
+      req_per_min: 100
+      tokens_per_min: 60000
+  - id: "custom-dev"
+    type: "custom"
+    api_keys: ["${CUSTOM_KEY_1}"]
+    base_url: "https://custom-llm.example.com"
+    model: "custom-model"
+    pricing:
+      input_token_cost: 0.001
+      output_token_cost: 0.002
+    limits:
+      req_per_min: 50
+      tokens_per_min: 10000
+
+api_keys:
+  - key: "test-key"
+    allowed_providers: ["*"]  # Access all providers
+    description: "Development test key"
+  - key: "openai-only"
+    allowed_providers: ["openai-prod"]
+    description: "OpenAI production access only"
+  - key: "gemini-only"
+    allowed_providers: ["gemini-prod"]
+    description: "Gemini production access only"
+  - key: "premium"
+    allowed_providers: ["openai-prod", "claude-prod"]
+    description: "Premium access to OpenAI and Claude production"
+  - key: "dev-access"
+    allowed_providers: ["custom-dev"]
+    description: "Development access to custom provider"
 
 model_aliases:
-  gpt-4o: openai:gpt-4o
-  gemini-1.5-pro: gemini:gemini-1.5-pro
-  claude-3-opus: claude:claude-3-opus
+  gpt-4o: openai-prod:gpt-4o
+  gemini-1.5-pro: gemini-prod:gemini-1.5-pro
+  gemini-2.5-flash: gemini-prod:gemini-2.5-flash
+  claude-3-opus: claude-prod:claude-3-opus
+  custom-model: custom-dev:custom-model
 
 policy:
   strategy: "hybrid"
-  cost_first: false
-  hybrid_weights:
-    token_ratio: 0.3
+  algorithm: "hybrid"   # "round_robin", "least_loaded", "hybrid"
+  priority: "balanced"  # "balanced", "cost", "req", "token" (auto-sets weights)
+  hybrid_weights:       # Auto-set based on priority, or customize
+    token_ratio: 0.2
     req_ratio: 0.2
     error_score: 0.2
-    latency: 0.1
+    latency: 0.2
     cost_ratio: 0.2
+  retry:
+    max_attempts: 3      # Max retry attempts
+    timeout: "30s"       # Timeout per attempt
+    interval: "1s"       # Interval between retries
+  cache:
+     enabled: true        # Enable response caching
+     ttl_seconds: 10      # Cache TTL (10 seconds)

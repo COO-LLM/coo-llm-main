@@ -16,12 +16,11 @@ func TestFileStore(t *testing.T) {
 version: "1.0"
 server:
   listen: ":8080"
-providers:
-  - id: "openai"
-    base_url: "https://api.openai.com/v1"
-    keys:
-      - id: "key1"
-        secret: "sk-test"
+llm_providers:
+  - type: "openai"
+    api_keys: ["sk-test"]
+    base_url: "https://api.openai.com"
+    model: "gpt-4o"
 `
 	tmpFile, err := os.CreateTemp("", "config*.yaml")
 	require.NoError(t, err)
@@ -44,6 +43,48 @@ providers:
 	cfg2, err := store.LoadConfig()
 	require.NoError(t, err)
 	assert.Equal(t, "2.0", cfg2.Version)
+}
+
+func TestMemoryStore(t *testing.T) {
+	store := NewMemoryStore()
+
+	// Test IncrementUsage
+	err := store.IncrementUsage("openai", "key1", "req", 5.0)
+	require.NoError(t, err)
+
+	err = store.IncrementUsage("openai", "key1", "tokens", 100.0)
+	require.NoError(t, err)
+
+	err = store.IncrementUsage("openai", "key1", "input_tokens", 50.0)
+	require.NoError(t, err)
+
+	err = store.IncrementUsage("openai", "key1", "output_tokens", 50.0)
+	require.NoError(t, err)
+
+	// Test GetUsage
+	val, err := store.GetUsage("openai", "key1", "req")
+	require.NoError(t, err)
+	assert.Equal(t, 5.0, val)
+
+	val, err = store.GetUsage("openai", "key1", "tokens")
+	require.NoError(t, err)
+	assert.Equal(t, 100.0, val)
+
+	val, err = store.GetUsage("openai", "key1", "input_tokens")
+	require.NoError(t, err)
+	assert.Equal(t, 50.0, val)
+
+	val, err = store.GetUsage("openai", "key1", "output_tokens")
+	require.NoError(t, err)
+	assert.Equal(t, 50.0, val)
+
+	// Test SetUsage
+	err = store.SetUsage("openai", "key1", "latency", 500.0)
+	require.NoError(t, err)
+
+	val, err = store.GetUsage("openai", "key1", "latency")
+	require.NoError(t, err)
+	assert.Equal(t, 500.0, val)
 }
 
 func TestRedisStore(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/user/truckllm/internal/config"
+	"github.com/user/coo-llm/internal/config"
 )
 
 type Registry struct {
@@ -45,19 +45,47 @@ func (r *Registry) List() []string {
 }
 
 func (r *Registry) LoadFromConfig(cfg *config.Config) error {
-	for _, pCfg := range cfg.Providers {
-		var p Provider
-		switch pCfg.ID {
-		case "openai":
-			p = NewOpenAIProvider(&pCfg)
-		case "gemini":
-			p = NewGeminiProvider(&pCfg)
-		case "claude":
-			p = NewClaudeProvider(&pCfg)
-		default:
-			return fmt.Errorf("unsupported provider: %s", pCfg.ID)
+	// Load new LLMProviders
+	for _, lp := range cfg.LLMProviders {
+		llmCfg := LLMConfig{
+			Type:    ProviderType(lp.Type),
+			APIKeys: lp.APIKeys,
+			BaseURL: lp.BaseURL,
+			Model:   lp.Model,
+			Pricing: lp.Pricing,
+			Limits:  lp.Limits,
+		}
+		p, err := NewLLMProvider(llmCfg)
+		if err != nil {
+			return err
 		}
 		r.Register(p)
+	}
+
+	// Fallback to legacy Providers if no LLMProviders
+	if len(cfg.LLMProviders) == 0 {
+		for _, pCfg := range cfg.Providers {
+			keys := make([]string, len(pCfg.Keys))
+			for i, k := range pCfg.Keys {
+				keys[i] = k.Secret
+			}
+			llmCfg := LLMConfig{
+				Type:    ProviderType(pCfg.ID),
+				APIKeys: keys,
+				BaseURL: pCfg.BaseURL,
+				Model:   "gpt-4",
+				Pricing: pCfg.Keys[0].Pricing,
+				Limits: config.Limits{
+					ReqPerMin:    pCfg.Keys[0].LimitReqPerMin,
+					TokensPerMin: pCfg.Keys[0].LimitTokensPerMin,
+				},
+			}
+			p, err := NewLLMProvider(llmCfg)
+			if err != nil {
+				return err
+			}
+			r.Register(p)
+		}
 	}
 	return nil
 }

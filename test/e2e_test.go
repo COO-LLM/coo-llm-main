@@ -11,11 +11,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/user/truckllm/internal/api"
-	"github.com/user/truckllm/internal/balancer"
-	"github.com/user/truckllm/internal/config"
-	"github.com/user/truckllm/internal/log"
-	"github.com/user/truckllm/internal/provider"
+	"github.com/user/coo-llm/internal/api"
+	"github.com/user/coo-llm/internal/balancer"
+	"github.com/user/coo-llm/internal/config"
+	"github.com/user/coo-llm/internal/log"
+	"github.com/user/coo-llm/internal/provider"
 )
 
 // mockStore implements store.RuntimeStore for testing
@@ -49,49 +49,32 @@ func (m *mockStore) SetUsage(provider, keyID, metric string, value float64) erro
 }
 
 func (m *mockStore) IncrementUsage(provider, keyID, metric string, delta float64) error {
-	if m.data == nil {
-		m.data = make(map[string]map[string]map[string]float64)
-	}
-	if m.data[provider] == nil {
-		m.data[provider] = make(map[string]map[string]float64)
-	}
-	if m.data[provider][keyID] == nil {
-		m.data[provider][keyID] = make(map[string]float64)
-	}
-	val := m.data[provider][keyID][metric]
-	m.data[provider][keyID][metric] = val + delta
+	val, _ := m.GetUsage(provider, keyID, metric)
+	return m.SetUsage(provider, keyID, metric, val+delta)
+}
+
+func (m *mockStore) GetUsageInWindow(provider, keyID, metric string, windowSeconds int64) (float64, error) {
+	return m.GetUsage(provider, keyID, metric)
+}
+
+func (m *mockStore) SetCache(key, value string, ttlSeconds int64) error {
 	return nil
+}
+
+func (m *mockStore) GetCache(key string) (string, error) {
+	return "", nil
 }
 
 // Mock provider that simulates external API
 type e2eMockProvider struct{}
 
 func (m *e2eMockProvider) Name() string { return "openai" }
-func (m *e2eMockProvider) Generate(ctx context.Context, req *provider.Request) (*provider.Response, error) {
+func (m *e2eMockProvider) Generate(ctx context.Context, req *provider.LLMRequest) (*provider.LLMResponse, error) {
 	// Simulate API delay and response
-	return &provider.Response{
-		RawResponse: []byte(`{
-			"id": "chatcmpl-123",
-			"object": "chat.completion",
-			"created": 1677652288,
-			"model": "gpt-4o",
-			"choices": [{
-				"index": 0,
-				"message": {
-					"role": "assistant",
-					"content": "Hello! How can I help you today?"
-				},
-				"finish_reason": "stop"
-			}],
-			"usage": {
-				"prompt_tokens": 9,
-				"completion_tokens": 12,
-				"total_tokens": 21
-			}
-		}`),
-		HTTPCode:   200,
-		Latency:    150,
-		TokensUsed: 21,
+	return &provider.LLMResponse{
+		Text:         "Hello! How can I help you today?",
+		TokensUsed:   21,
+		FinishReason: "stop",
 	}, nil
 }
 func (m *e2eMockProvider) ListModels(ctx context.Context) ([]string, error) {
