@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  truckllm:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - CONFIG_PATH=/app/configs/config.yaml
+    depends_on:
+      - redis
+    volumes:
+      - ./logs:/app/logs
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:

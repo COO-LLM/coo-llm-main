@@ -1,0 +1,78 @@
+version: "1.0"
+
+server:
+  listen: ":8080"
+  admin_api_key: "admin-secret"
+
+logging:
+  file:
+    enabled: true
+    path: "./logs/llm.log"
+    max_size_mb: 100
+    max_backups: 5
+  prometheus:
+    enabled: true
+    endpoint: "/metrics"
+  providers: []
+
+storage:
+  config:
+    type: "file"
+    path: "./configs/config.yaml"
+  runtime:
+    type: "redis"
+    addr: "localhost:6379"
+    password: ""
+
+providers:
+  - id: "openai"
+    name: "OpenAI"
+    base_url: "https://api.openai.com/v1"
+    keys:
+      - id: "oa-1"
+        secret: "${OPENAI_KEY_1}"
+        limit_req_per_min: 200
+        limit_tokens_per_min: 100000
+        pricing:
+          input_token_cost: 0.002
+          output_token_cost: 0.01
+          currency: "USD"
+  - id: "gemini"
+    name: "Gemini"
+    base_url: "https://generativelanguage.googleapis.com/v1"
+    keys:
+      - id: "gm-1"
+        secret: "${GEMINI_KEY_1}"
+        limit_req_per_min: 150
+        limit_tokens_per_min: 80000
+        pricing:
+          input_token_cost: 0.00025
+          output_token_cost: 0.0005
+          currency: "USD"
+  - id: "claude"
+    name: "Claude"
+    base_url: "https://api.anthropic.com/v1"
+    keys:
+      - id: "cl-1"
+        secret: "${CLAUDE_KEY_1}"
+        limit_req_per_min: 100
+        limit_tokens_per_min: 60000
+        pricing:
+          input_token_cost: 0.015
+          output_token_cost: 0.075
+          currency: "USD"
+
+model_aliases:
+  gpt-4o: openai:gpt-4o
+  gemini-1.5-pro: gemini:gemini-1.5-pro
+  claude-3-opus: claude:claude-3-opus
+
+policy:
+  strategy: "hybrid"
+  cost_first: false
+  hybrid_weights:
+    token_ratio: 0.3
+    req_ratio: 0.2
+    error_score: 0.2
+    latency: 0.1
+    cost_ratio: 0.2
