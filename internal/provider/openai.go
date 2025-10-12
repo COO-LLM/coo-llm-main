@@ -61,9 +61,9 @@ func (p *OpenAIProvider) Generate(ctx context.Context, req *Request) (*Response,
 
 	tokensUsed := 0
 	if resp.StatusCode == 200 {
-		var jsonResp map[string]interface{}
+		var jsonResp map[string]any
 		if err := json.Unmarshal(body, &jsonResp); err == nil {
-			if usage, ok := jsonResp["usage"].(map[string]interface{}); ok {
+			if usage, ok := jsonResp["usage"].(map[string]any); ok {
 				if total, ok := usage["total_tokens"].(float64); ok {
 					tokensUsed = int(total)
 				}

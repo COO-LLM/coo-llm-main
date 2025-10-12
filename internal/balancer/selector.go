@@ -105,7 +105,7 @@ func (s *Selector) selectHybrid(pCfg *config.Provider, model string) (*config.Ke
 	return best, nil
 }
 
-func (s *Selector) calculateScore(providerID string, key *config.Key, model string) float64 {
+func (s *Selector) calculateScore(providerID string, key *config.Key, _ string) float64 {
 	w := s.cfg.Policy.HybridWeights
 
 	reqUsage, _ := s.store.GetUsage(providerID, key.ID, "req")

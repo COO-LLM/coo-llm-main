@@ -24,7 +24,7 @@ func NewChatCompletionsHandler(selector *balancer.Selector, logger *log.Logger, 
 }
 
 func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) {
-	var req map[string]interface{}
+	var req map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

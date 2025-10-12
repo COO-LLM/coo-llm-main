@@ -12,9 +12,9 @@ type Provider interface {
 }
 
 type Request struct {
-	Model  string                 `json:"model"`
-	Input  map[string]interface{} `json:"input"`
-	APIKey string                 `json:"api_key"`
+	Model  string         `json:"model"`
+	Input  map[string]any `json:"input"`
+	APIKey string         `json:"api_key"`
 }
 
 type Response struct {

@@ -133,7 +133,7 @@ func TestE2E_ChatCompletionsFlow(t *testing.T) {
 	defer ts.Close()
 
 	// Test chat completions request
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": "gpt-4o",
 		"messages": []map[string]string{
 			{"role": "user", "content": "Hello"},
@@ -148,15 +148,15 @@ func TestE2E_ChatCompletionsFlow(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var response map[string]interface{}
+	var response map[string]any
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	require.NoError(t, err)
 
 	assert.Equal(t, "chat.completion", response["object"])
-	choices := response["choices"].([]interface{})
+	choices := response["choices"].([]any)
 	assert.Len(t, choices, 1)
-	choice := choices[0].(map[string]interface{})
-	message := choice["message"].(map[string]interface{})
+	choice := choices[0].(map[string]any)
+	message := choice["message"].(map[string]any)
 	assert.Equal(t, "assistant", message["role"])
 	assert.Contains(t, message["content"], "Hello")
 }
@@ -180,12 +180,12 @@ func TestE2E_ModelsEndpoint(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var response map[string]interface{}
+	var response map[string]any
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	require.NoError(t, err)
 
 	assert.Equal(t, "list", response["object"])
-	data := response["data"].([]interface{})
+	data := response["data"].([]any)
 	assert.Len(t, data, 1)
 	model := data[0].(map[string]interface{})
 	assert.Equal(t, "gpt-4o", model["id"])

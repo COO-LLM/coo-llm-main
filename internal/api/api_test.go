@@ -34,12 +34,12 @@ func TestModelsEndpoint(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
 	assert.Equal(t, "list", resp["object"])
-	data := resp["data"].([]interface{})
+	data := resp["data"].([]any)
 	assert.Len(t, data, 1)
 }
 
@@ -71,7 +71,7 @@ func TestChatCompletionsEndpoint(t *testing.T) {
 	r := chi.NewRouter()
 	SetupRoutes(r, selector, logger, reg, cfg)
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"model": "gpt-4o",
 		"messages": []map[string]string{
 			{"role": "user", "content": "Hello"},
@@ -86,6 +86,71 @@ func TestChatCompletionsEndpoint(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Contains(t, resp, "choices")
+}
+
+func TestChatCompletionsEndpoint_InvalidModel(t *testing.T) {
+	cfg := &config.Config{
+		Providers: []config.Provider{
+			{
+				ID: "openai",
+				Keys: []config.Key{
+					{ID: "key1", Secret: "sk-test"},
+				},
+			},
+		},
+		Policy: config.Policy{Strategy: "round_robin"},
+	}
+
+	reg := provider.NewRegistry()
+	reg.Register(&mockProvider{})
+
+	runtimeStore := &mockStore{}
+	selector := balancer.NewSelector(cfg, runtimeStore)
+	logger := log.NewLogger(&config.Logging{})
+
+	r := chi.NewRouter()
+	SetupRoutes(r, selector, logger, reg, cfg)
+
+	reqBody := map[string]any{
+		"messages": []map[string]string{
+			{"role": "user", "content": "Hello"},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestModelsEndpoint_EmptyConfig(t *testing.T) {
+	cfg := &config.Config{}
+
+	r := chi.NewRouter()
+	SetupModelsRoute(r, cfg)
+
+	req := httptest.NewRequest("GET", "/v1/models", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, "list", resp["object"])
+	data := resp["data"].([]interface{})
+	assert.Len(t, data, 0)
 }
 
 type mockProvider struct{}
