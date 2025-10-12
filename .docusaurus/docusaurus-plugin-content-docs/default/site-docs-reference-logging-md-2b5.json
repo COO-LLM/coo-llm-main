@@ -1,0 +1,24 @@
+{
+  "unversionedId": "reference/logging",
+  "id": "reference/logging",
+  "title": "Logging",
+  "description": "---",
+  "source": "@site/docs/reference/logging.md",
+  "sourceDirName": "reference",
+  "slug": "/reference/logging",
+  "permalink": "/truckllm/docs/reference/logging",
+  "draft": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/reference/logging.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Load Balancer",
+    "permalink": "/truckllm/docs/reference/balancer"
+  },
+  "next": {
+    "title": "Storage",
+    "permalink": "/truckllm/docs/reference/storage"
+  }
+}

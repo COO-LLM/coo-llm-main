@@ -1,7 +1,8 @@
 # Storage
 
 ---
-sidebar_position: 3
+sidebar_position: 4
+tags: [developer-guide, storage]
 ---
 
 TruckLLM uses multiple storage backends for different purposes: runtime metrics, configuration, and logging. The system supports pluggable storage providers for maximum flexibility.

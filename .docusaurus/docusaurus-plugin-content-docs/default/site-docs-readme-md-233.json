@@ -1,0 +1,24 @@
+{
+  "unversionedId": "README",
+  "id": "README",
+  "title": "TruckLLM Documentation",
+  "description": "This directory contains the documentation for TruckLLM, built with Docusaurus.",
+  "source": "@site/docs/README.md",
+  "sourceDirName": ".",
+  "slug": "/",
+  "permalink": "/truckllm/docs/",
+  "draft": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/README.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Contributing",
+    "permalink": "/truckllm/docs/contributing"
+  },
+  "next": {
+    "title": "Changelog",
+    "permalink": "/truckllm/docs/contributing/changelog"
+  }
+}

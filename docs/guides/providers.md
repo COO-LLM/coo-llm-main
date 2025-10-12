@@ -1,7 +1,8 @@
 # Providers
 
 ---
-sidebar_position: 3
+sidebar_position: 4
+tags: [user-guide, providers]
 ---
 
 TruckLLM supports multiple LLM providers through a plugin-based architecture. Each provider implements a common interface for seamless integration.

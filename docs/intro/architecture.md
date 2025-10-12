@@ -1,7 +1,8 @@
 # Architecture
 
 ---
-sidebar_position: 3
+sidebar_position: 1
+tags: [developer-guide, architecture]
 ---
 
 This document describes the high-level architecture of TruckLLM, including component interactions and design decisions.
@@ -9,6 +10,28 @@ This document describes the high-level architecture of TruckLLM, including compo
 ## System Overview
 
 TruckLLM follows a modular, plugin-based architecture designed for extensibility and maintainability. The system is built in Go and uses a layered architecture pattern.
+
+```mermaid
+graph TB
+    A[Client Applications<br/>OpenAI SDK, Web Apps] --> B[API Layer<br/>OpenAI-Compatible Endpoints]
+    B --> C[Load Balancer Engine<br/>Provider & Key Selection]
+    C --> D[Provider Adapters<br/>OpenAI, Gemini, Claude]
+    D --> E[External LLM Providers<br/>OpenAI API, Google AI, Anthropic]
+
+    C --> F[Storage & Logging<br/>Redis, File, Prometheus]
+    F --> C
+
+    B --> G[Admin API<br/>Configuration, Metrics]
+    G --> F
+
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#ffebee
+    style F fill:#f3e5f5
+    style G fill:#e0f2f1
+```
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

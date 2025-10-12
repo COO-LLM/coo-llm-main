@@ -1,0 +1,108 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/truckllm/docs",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/truckllm/docs",
+          "mainDocId": "README",
+          "docs": [
+            {
+              "id": "contributing",
+              "path": "/truckllm/docs/contributing",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "contributing/changelog",
+              "path": "/truckllm/docs/contributing/changelog",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "contributing/guidelines",
+              "path": "/truckllm/docs/contributing/guidelines",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "guides",
+              "path": "/truckllm/docs/guides",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "guides/configuration",
+              "path": "/truckllm/docs/guides/configuration",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "guides/deployment",
+              "path": "/truckllm/docs/guides/deployment",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "guides/providers",
+              "path": "/truckllm/docs/guides/providers",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "intro",
+              "path": "/truckllm/docs/intro",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "intro/architecture",
+              "path": "/truckllm/docs/intro/architecture",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "intro/overview",
+              "path": "/truckllm/docs/intro/overview",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "README",
+              "path": "/truckllm/docs/",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "reference",
+              "path": "/truckllm/docs/reference",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "reference/api",
+              "path": "/truckllm/docs/reference/api",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "reference/balancer",
+              "path": "/truckllm/docs/reference/balancer",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "reference/logging",
+              "path": "/truckllm/docs/reference/logging",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "reference/storage",
+              "path": "/truckllm/docs/reference/storage",
+              "sidebar": "tutorialSidebar"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "tutorialSidebar": {
+              "link": {
+                "path": "/truckllm/docs/intro",
+                "label": "intro"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

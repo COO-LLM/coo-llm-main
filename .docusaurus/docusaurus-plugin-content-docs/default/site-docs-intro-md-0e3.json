@@ -1,0 +1,23 @@
+{
+  "unversionedId": "intro",
+  "id": "intro",
+  "title": "Introduction",
+  "description": "Welcome to TruckLLM! This section provides an overview of what TruckLLM is and how it works.",
+  "source": "@site/docs/intro.md",
+  "sourceDirName": ".",
+  "slug": "/intro",
+  "permalink": "/truckllm/docs/intro",
+  "draft": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/intro.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1
+  },
+  "sidebar": "tutorialSidebar",
+  "next": {
+    "title": "Guides",
+    "permalink": "/truckllm/docs/guides"
+  }
+}

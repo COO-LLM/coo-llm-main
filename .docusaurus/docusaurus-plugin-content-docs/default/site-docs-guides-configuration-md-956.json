@@ -1,0 +1,24 @@
+{
+  "unversionedId": "guides/configuration",
+  "id": "guides/configuration",
+  "title": "Configuration",
+  "description": "---",
+  "source": "@site/docs/guides/configuration.md",
+  "sourceDirName": "guides",
+  "slug": "/guides/configuration",
+  "permalink": "/truckllm/docs/guides/configuration",
+  "draft": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/guides/configuration.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Contributing",
+    "permalink": "/truckllm/docs/contributing/guidelines"
+  },
+  "next": {
+    "title": "Deployment",
+    "permalink": "/truckllm/docs/guides/deployment"
+  }
+}

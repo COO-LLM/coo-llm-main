@@ -1,0 +1,24 @@
+{
+  "unversionedId": "intro/architecture",
+  "id": "intro/architecture",
+  "title": "Architecture",
+  "description": "---",
+  "source": "@site/docs/intro/architecture.md",
+  "sourceDirName": "intro",
+  "slug": "/intro/architecture",
+  "permalink": "/truckllm/docs/intro/architecture",
+  "draft": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/intro/architecture.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Providers",
+    "permalink": "/truckllm/docs/guides/providers"
+  },
+  "next": {
+    "title": "Overview",
+    "permalink": "/truckllm/docs/intro/overview"
+  }
+}

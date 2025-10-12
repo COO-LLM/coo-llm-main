@@ -1,4 +1,7 @@
-/** @type {import('@docusaurus/types').Config} */
+const lightCodeTheme = require('prism-react-renderer/themes/github');
+const darkCodeTheme = require('prism-react-renderer/themes/dracula');
+
+/** @type {import('@docusaurus/types').DocusaurusConfig} */
 const config = {
   title: 'TruckLLM',
   tagline: 'Intelligent LLM API Load Balancing',
@@ -51,6 +54,8 @@ const config = {
       }),
     ],
   ],
+
+  themes: ['@docusaurus/theme-mermaid'],
 
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
@@ -135,7 +140,12 @@ const config = {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
       },
+      mermaid: {
+        options: {
+          theme: { light: 'base', dark: 'dark' },
+        },
+      },
     }),
 };
 
-export default config;
+module.exports = config;

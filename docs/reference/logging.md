@@ -1,7 +1,8 @@
 # Logging
 
 ---
-sidebar_position: 4
+sidebar_position: 5
+tags: [developer-guide, logging]
 ---
 
 TruckLLM provides comprehensive logging and observability features with multiple output backends and structured logging capabilities.

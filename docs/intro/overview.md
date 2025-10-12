@@ -1,7 +1,8 @@
 # Overview
 
 ---
-sidebar_position: 2
+sidebar_position: 1
+tags: [user-guide, getting-started]
 ---
 
 TruckLLM is an intelligent reverse proxy and load balancer for Large Language Model (LLM) APIs. It provides a unified, OpenAI-compatible interface to multiple LLM providers while intelligently distributing requests across API keys and providers based on performance, cost, and rate limits.

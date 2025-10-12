@@ -1,7 +1,8 @@
 # API Reference
 
 ---
-sidebar_position: 1
+sidebar_position: 2
+tags: [developer-guide, api]
 ---
 
 TruckLLM provides OpenAI-compatible REST APIs for LLM interactions, plus administrative endpoints for management.

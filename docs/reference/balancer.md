@@ -1,7 +1,8 @@
 # Load Balancer
 
 ---
-sidebar_position: 2
+sidebar_position: 3
+tags: [developer-guide, balancer]
 ---
 
 The load balancer is the core intelligence of TruckLLM, responsible for selecting optimal provider and API key combinations based on performance, cost, and availability.

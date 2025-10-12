@@ -1,7 +1,8 @@
 # Configuration
 
 ---
-sidebar_position: 1
+sidebar_position: 2
+tags: [user-guide, configuration]
 ---
 
 TruckLLM uses YAML configuration files for all settings. The configuration is hierarchical and supports environment variable substitution, validation, and hot-reload.

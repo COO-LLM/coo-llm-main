@@ -1,7 +1,8 @@
 # Contributing
 
 ---
-sidebar_position: 1
+sidebar_position: 6
+tags: [developer-guide, contributing]
 ---
 
 Thank you for your interest in contributing to TruckLLM! This document provides guidelines and information for contributors.

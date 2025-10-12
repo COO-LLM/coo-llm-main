@@ -1,7 +1,8 @@
 # Deployment
 
 ---
-sidebar_position: 2
+sidebar_position: 3
+tags: [user-guide, deployment]
 ---
 
 This guide covers deploying TruckLLM in various environments, from development to production.

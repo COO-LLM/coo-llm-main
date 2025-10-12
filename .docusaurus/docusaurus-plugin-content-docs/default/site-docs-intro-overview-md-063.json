@@ -1,0 +1,24 @@
+{
+  "unversionedId": "intro/overview",
+  "id": "intro/overview",
+  "title": "Overview",
+  "description": "---",
+  "source": "@site/docs/intro/overview.md",
+  "sourceDirName": "intro",
+  "slug": "/intro/overview",
+  "permalink": "/truckllm/docs/intro/overview",
+  "draft": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/intro/overview.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Architecture",
+    "permalink": "/truckllm/docs/intro/architecture"
+  },
+  "next": {
+    "title": "API Reference",
+    "permalink": "/truckllm/docs/reference/api"
+  }
+}

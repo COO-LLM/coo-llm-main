@@ -1,0 +1,20 @@
+{
+  "unversionedId": "reference/storage",
+  "id": "reference/storage",
+  "title": "Storage",
+  "description": "---",
+  "source": "@site/docs/reference/storage.md",
+  "sourceDirName": "reference",
+  "slug": "/reference/storage",
+  "permalink": "/truckllm/docs/reference/storage",
+  "draft": false,
+  "editUrl": "https://github.com/your-org/truckllm/tree/main/docs/reference/storage.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Logging",
+    "permalink": "/truckllm/docs/reference/logging"
+  }
+}

@@ -1,7 +1,8 @@
 # Changelog
 
 ---
-sidebar_position: 2
+sidebar_position: 7
+tags: [developer-guide, changelog]
 ---
 
 All notable changes to TruckLLM will be documented in this file.
