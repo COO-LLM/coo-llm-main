@@ -151,3 +151,5 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/build
           destination_dir: .
+          external_repository: COO-LLM/docs
+          publish_branch: main
