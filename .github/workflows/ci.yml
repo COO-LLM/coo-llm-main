@@ -141,8 +141,8 @@ jobs:
      - name: Install dependencies
        run: cd docs && npm ci
 
-     - name: Build docs
-       run: cd docs && npm run build
+      - name: Build docs
+        run: cd docs && npm run build
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
