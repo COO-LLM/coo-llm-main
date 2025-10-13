@@ -53,46 +53,6 @@ func (s *Selector) SelectBest(model string) (*config.Provider, *config.Key, stri
 	}
 
 	return nil, nil, "", fmt.Errorf("provider not found: %s", providerID)
-
-	var pCfg *config.Provider
-
-	// Try LLMProviders first
-	for i := range s.cfg.LLMProviders {
-		if s.cfg.LLMProviders[i].ID == providerID {
-			var secret string
-			if len(s.cfg.LLMProviders[i].APIKeys) > 0 {
-				secret = s.cfg.LLMProviders[i].APIKeys[0]
-			}
-			pCfg = &config.Provider{
-				ID:      s.cfg.LLMProviders[i].ID,
-				BaseURL: s.cfg.LLMProviders[i].BaseURL,
-				Keys:    []config.Key{{ID: "default", Secret: secret}},
-			}
-			break
-		}
-	}
-
-	// Fallback to legacy Providers
-	if pCfg == nil {
-		for i := range s.cfg.Providers {
-			if s.cfg.Providers[i].ID == providerID {
-				pCfg = &s.cfg.Providers[i]
-				break
-			}
-		}
-	}
-
-	if pCfg == nil {
-		return nil, nil, "", fmt.Errorf("provider not found: %s", providerID)
-	}
-
-	// Select best key based on strategy
-	key, err := s.selectKey(pCfg, modelName)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	return pCfg, key, modelName, nil
 }
 
 func (s *Selector) resolveModel(model string) (string, string) {
