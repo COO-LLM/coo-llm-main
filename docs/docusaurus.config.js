@@ -11,12 +11,12 @@ const config = {
   url: 'https://coo-llm.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/',
+  baseUrl: '/coo-llm-main/',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'DIB', // Usually your GitHub org/user name.
-  projectName: 'coo-llm-main', // Usually your repo name.
+   organizationName: 'coo-llm', // Usually your GitHub org/user name.
+   projectName: 'coo-llm-main', // Usually your repo name.
 
   onBrokenLinks: 'ignore',
   onBrokenMarkdownLinks: 'warn',
@@ -102,15 +102,15 @@ const config = {
             items: [
               {
                 label: 'GitHub',
-                href: 'https://github.com/your-org/coo-llm',
+                href: 'https://github.com/COO-LLM/coo-llm-main',
               },
               {
                 label: 'Issues',
-                href: 'https://github.com/your-org/coo-llm/issues',
+                href: 'https://github.com/COO-LLM/coo-llm-main/issues',
               },
               {
                 label: 'Discussions',
-                href: 'https://github.com/your-org/coo-llm/discussions',
+                href: 'https://github.com/COO-LLM/coo-llm-main/discussions',
               },
             ],
           },

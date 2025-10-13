@@ -144,10 +144,10 @@ jobs:
      - name: Build docs
        run: cd docs && npm run build
 
-     - name: Deploy to GitHub Pages
-       if: github.ref == 'refs/heads/main'
-       uses: peaceiris/actions-gh-pages@v3
-       with:
-         github_token: ${{ secrets.GITHUB_TOKEN }}
-         publish_dir: ./docs/build
-         cname: coo-llm.dev
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/build
+          destination_dir: .
