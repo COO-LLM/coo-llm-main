@@ -8,6 +8,38 @@ tags: [user-guide, deployment]
 
 This guide covers deploying COO-LLM in various environments, from development to production.
 
+## Deployment Options
+
+```mermaid
+flowchart TD
+    classDef dev fill:#28a745,color:#fff,stroke:#fff,stroke-width:2px
+    classDef prod fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
+    classDef cloud fill:#007bff,color:#fff,stroke:#fff,stroke-width:2px
+
+    A[Development]:::dev
+    A --> B[Local Binary<br/>go build]:::dev
+    A --> C[Docker Compose<br/>Single container]:::dev
+
+    D[Production]:::prod
+    D --> E[Docker<br/>Containerized]:::prod
+    D --> F[Kubernetes<br/>Orchestrated]:::prod
+    D --> G[AWS/GCP/Azure<br/>Cloud deployment]:::prod
+
+    H[Cloud Services]:::cloud
+    H --> I[Vercel<br/>Serverless]:::cloud
+    H --> J[Heroku<br/>PaaS]:::cloud
+    H --> K[DigitalOcean<br/>Droplets]:::cloud
+
+    B --> L[Config File<br/>Environment vars]:::dev
+    C --> L
+    E --> M[Config via<br/>Environment]:::prod
+    F --> N[ConfigMaps<br/>Secrets]:::prod
+    G --> O[Cloud Config<br/>Parameter Store]:::prod
+    I --> P[Environment<br/>Variables]:::cloud
+    J --> P
+    K --> P
+```
+
 ## Quick Start
 
 ### Local Development
@@ -69,25 +101,32 @@ This guide covers deploying COO-LLM in various environments, from development to
 ### Docker Deployment
 
 1. **Build image:**
-   ```bash
-   docker build -t coo-llm:latest .
-   ```
+    ```bash
+    docker build -t coo-llm:latest .
+    ```
 
-2. **Run container:**
-   ```bash
-   docker run -p 8080:8080 \
-     -e OPENAI_API_KEY="sk-your-key" \
-     -e GEMINI_API_KEY="your-gemini-key" \
-     -v $(pwd)/configs:/app/configs \
-     -v $(pwd)/logs:/app/logs \
-     coo-llm:latest
-   ```
+2. **Prepare config:**
+    ```bash
+    # Create your config.yaml with API keys and settings
+    mkdir configs
+    # Edit configs/config.yaml
+    ```
+
+3. **Run container:**
+    ```bash
+    docker run -p 8080:8080 \
+      -e OPENAI_API_KEY="sk-your-key" \
+      -e GEMINI_API_KEY="your-gemini-key" \
+      -v $(pwd)/configs:/app/configs \
+      -v $(pwd)/logs:/app/logs \
+      coo-llm:latest
+    ```
 
 **Dockerfile details:**
 - Multi-stage build with Go 1.23
 - Alpine Linux base image for minimal size
 - Non-root user for security
-- Default config included in image
+- Config mounted from host for flexibility and security
 
 ### Docker Compose
 
@@ -101,12 +140,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - CONFIG_PATH=/app/configs/config.yaml
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - redis
     volumes:
+      - ./configs:/app/configs  # Mount config from host
       - ./logs:/app/logs
 
   redis:

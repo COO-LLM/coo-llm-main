@@ -28,7 +28,9 @@ const config = {
     defaultLocale: 'en',
     locales: ['en'],
   },
-
+  markdown: {
+    mermaid: true,
+  },
   presets: [
     [
       'classic',
@@ -39,18 +41,18 @@ const config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/your-org/coo-llm/tree/main/docs/docs/',
-          remarkPlugins: [],
+            'https://github.com/coo-llm/coo-llm-main/tree/main/docs/docs/',
+          remarkPlugins: [require('remark-mermaid')],
         },
         blog: false,
         theme: {
-          customCss: './src/css/custom.css',
+          customCss: require.resolve('./src/css/custom.css'),
         },
-      }),
+      })
     ],
   ],
 
-
+  themes: ['@docusaurus/theme-mermaid'],
 
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
@@ -71,14 +73,14 @@ const config = {
             label: 'Docs',
           },
           {
-            href: 'https://github.com/your-org/coo-llm',
+            href: 'https://github.com/COO-LLM/coo-llm-main',
             label: 'GitHub',
             position: 'right',
           },
         ],
       },
       footer: {
-        style: 'light',
+        style: 'dark',
         links: [
           {
             title: 'Docs',
@@ -129,6 +131,11 @@ const config = {
       prism: {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
+      },
+      mermaid: {
+        options: {
+          theme: 'default',
+        },
       },
 
     }),

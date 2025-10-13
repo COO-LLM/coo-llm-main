@@ -47,7 +47,7 @@ export GEMINI_API_KEY="your-gemini-key"
 cat > configs/config.yaml << EOF
 version: "1.0"
 server:
-  listen: ":8080"
+  listen: ":2906"
   admin_api_key: "admin-secret"
 
 llm_providers:
@@ -92,12 +92,12 @@ EOF
 ./bin/coo-llm
 
 # Test simple request
-curl -X POST http://localhost:8080/v1/chat/completions \
+curl -X POST http://localhost:2906/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello!"}]}'
 
 # Test conversation history
-curl -X POST http://localhost:8080/v1/chat/completions \
+curl -X POST http://localhost:2906/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o",
@@ -116,14 +116,14 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 docker build -t coo-llm .
 
 # Run with local build
-docker run -p 8080:8080 \
+docker run -p 2906:2906 \
   -e OPENAI_API_KEY="sk-your-key" \
   -e GEMINI_API_KEY="your-gemini-key" \
   -v $(pwd)/configs:/app/configs \
   coo-llm
 
 # Or use pre-built images from Docker Hub
-docker run -p 8080:8080 \
+docker run -p 2906:2906 \
   -e OPENAI_API_KEY="sk-your-key" \
   -v $(pwd)/configs:/app/configs \
   your-dockerhub-username/coo-llm:latest
@@ -148,7 +148,7 @@ const llm = new ChatOpenAI({
   modelName: 'gpt-4o',
   openAIApiKey: 'dummy-key', // Ignored by COO-LLM
   configuration: {
-    baseURL: 'http://localhost:8080/v1',
+    baseURL: 'http://localhost:2906/v1',
   },
 });
 
@@ -171,7 +171,7 @@ from langchain_openai import ChatOpenAI
 llm = ChatOpenAI(
     model="gpt-4o",
     openai_api_key="dummy-key",  # Ignored by COO-LLM
-    openai_api_base="http://localhost:8080/v1"
+    openai_api_base="http://localhost:2906/v1"
 )
 
 response = llm.invoke("Hello!")
@@ -308,7 +308,7 @@ version: "1.0"
 
 # Server configuration
 server:
-  listen: ":8080"
+  listen: ":2906"
   admin_api_key: "${ADMIN_KEY}"
 
 # Logging configuration
@@ -410,7 +410,7 @@ api_keys:
 
 **Usage**: Include the API key in the `Authorization` header:
 ```bash
-curl -X POST http://localhost:8080/v1/chat/completions \
+curl -X POST http://localhost:2906/v1/chat/completions \
   -H "Authorization: Bearer your-secure-api-key-1" \
   -H "Content-Type: application/json" \
   -d '{
@@ -440,7 +440,7 @@ server:
 **Access admin endpoints**:
 ```bash
 curl -H "Authorization: Bearer your-admin-secret" \
-  http://localhost:8080/admin/v1/config
+  http://localhost:2906/admin/v1/config
 ```
 
 ### Production Deployment

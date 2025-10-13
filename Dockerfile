@@ -10,6 +10,6 @@ RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
 RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
 WORKDIR /app
 COPY --from=builder /app/coo-llm .
-COPY configs/config.yaml ./configs/config.yaml
 USER appuser
-CMD ["./coo-llm", "-config", "configs/config.yaml"]
+# Default config path, can be overridden with -config flag
+CMD ["./coo-llm"]

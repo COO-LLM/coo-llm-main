@@ -228,7 +228,18 @@ func normalizeText(text string) string {
 
 // GetProviderFromModel determines the provider ID from a model name
 func (h *ChatCompletionsHandler) GetProviderFromModel(model string) string {
-	// Check model aliases first
+	// 1. Check if model is in provider:model format
+	if colonIndex := strings.Index(model, ":"); colonIndex != -1 {
+		providerID := model[:colonIndex]
+		// Check if provider ID exists
+		for _, provider := range h.cfg.LLMProviders {
+			if provider.ID == providerID {
+				return provider.ID
+			}
+		}
+	}
+
+	// 2. Check model aliases
 	if alias, exists := h.cfg.ModelAliases[model]; exists {
 		// Parse provider from alias (format: "provider:model")
 		if colonIndex := strings.Index(alias, ":"); colonIndex != -1 {
@@ -251,7 +262,7 @@ func (h *ChatCompletionsHandler) GetProviderFromModel(model string) string {
 		}
 	}
 
-	// Fallback: try to infer from model name and find matching provider
+	// 3. Fallback: try to infer from model name and find matching provider
 	if strings.Contains(model, "gpt") || strings.Contains(model, "openai") {
 		for _, provider := range h.cfg.LLMProviders {
 			if provider.Type == "openai" {
@@ -274,7 +285,7 @@ func (h *ChatCompletionsHandler) GetProviderFromModel(model string) string {
 		}
 	}
 
-	return ""
+	return "" // No provider found
 }
 
 func SetupRoutes(r chi.Router, selector *balancer.Selector, logger *log.Logger, reg *provider.Registry, cfg *config.Config) {

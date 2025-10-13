@@ -17,6 +17,60 @@ Authorization: Bearer <api_key>
 
 API keys are configured in the providers section and mapped to specific keys.
 
+## Model Resolution
+
+COO-LLM supports 3 ways to specify models:
+
+1. **Direct provider:model syntax**: `provider_id:model_name` (e.g., `openai:gpt-4o`, `custom:my-model`)
+2. **Model aliases**: Short names mapped to provider:model (e.g., `gpt-4o` → `openai:gpt-4o`)
+3. **Pattern matching fallback**: Infer provider from model name (e.g., `gpt-4o` → OpenAI provider)
+
+## Authentication & Authorization Flow
+
+```mermaid
+flowchart TD
+    classDef client fill:#28a745,color:#fff,stroke:#fff,stroke-width:2px
+    classDef auth fill:#ffc107,color:#000,stroke:#000,stroke-width:2px
+    classDef process fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
+    classDef deny fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
+
+    A[Client Request<br/>with Bearer token]:::client
+    A --> B[Extract API Key<br/>from Authorization header]:::auth
+    B --> C{Key exists in<br/>api_keys config?}:::auth
+
+    C -->|No| D[401 Unauthorized<br/>Invalid API key]:::deny
+    C -->|Yes| E[Get allowed_providers<br/>for this key]:::auth
+    E --> F{Provider allowed<br/>for this request?}:::auth
+
+    F -->|No| G[403 Forbidden<br/>Access denied to provider]:::deny
+    F -->|Yes| H[Proceed to<br/>Request Processing]:::process
+```
+
+## API Request Flow
+
+```mermaid
+flowchart TD
+    classDef client fill:#28a745,color:#fff,stroke:#fff,stroke-width:2px
+    classDef process fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
+    classDef external fill:#007bff,color:#fff,stroke:#fff,stroke-width:2px
+
+    A[Client Request<br/>POST /v1/chat/completions]:::client
+    A --> B[Authentication<br/>Bearer Token Validation]:::process
+    B --> C[Model Alias Resolution<br/>Map to provider:model]:::process
+    C --> D[Provider & Key Selection<br/>Load Balancing Algorithm]:::process
+    D --> E[Rate Limit Check<br/>Per-key limits]:::process
+    E --> F[External API Call<br/>OpenAI/Gemini/Claude]:::external
+    F --> G[Response Processing<br/>Token counting, caching]:::process
+    G --> H[Usage Tracking<br/>Metrics update]:::process
+    H --> I[Return OpenAI-compatible<br/>JSON Response]:::client
+
+    B --> J[401 Unauthorized]:::process
+    E --> K[429 Rate Limited]:::process
+    F --> L[Retry Logic<br/>Up to max_attempts]:::process
+    L --> F
+    L --> M[502/503 Error<br/>Provider failure]:::process
+```
+
 ## OpenAI-Compatible Endpoints
 
 ### POST /v1/chat/completions

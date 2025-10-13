@@ -10,6 +10,31 @@ The load balancer is the core intelligence of COO-LLM, responsible for selecting
 
 ## Load Balancing Algorithms
 
+### Algorithm Overview
+
+```mermaid
+flowchart TD
+    classDef input fill:#28a745,color:#fff,stroke:#fff,stroke-width:2px
+    classDef process fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
+    classDef decision fill:#ffc107,color:#000,stroke:#000,stroke-width:2px
+    classDef output fill:#007bff,color:#fff,stroke:#fff,stroke-width:2px
+
+    A[Incoming Request<br/>Model: gpt-4o]:::input
+    A --> B[Resolve Model Alias<br/>Map to provider:model]:::process
+    B --> C[Get Available Keys<br/>Filter by provider]:::process
+    C --> D{Algorithm?}:::decision
+
+    D -->|Round Robin| E[Cycle through keys<br/>Respect rate limits]:::process
+    D -->|Least Loaded| F[Select lowest token usage<br/>Prefer non-limited keys]:::process
+    D -->|Hybrid| G[Calculate weighted score<br/>req + token + error + latency + cost]:::process
+
+    E --> H[Selected Key]:::output
+    F --> H
+    G --> H
+
+    H --> I[Execute Request<br/>With selected key]:::process
+```
+
 ### Round Robin
 
 **Algorithm:** `round_robin`

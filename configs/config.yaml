@@ -1,8 +1,8 @@
 version: "1.0"
 
 server:
-  listen: ":8081"
-  admin_api_key: "admin-secret"
+  listen: ":2906"
+  admin_api_key: "${ADMIN_API_KEY}"
 
 logging:
   file:
@@ -25,10 +25,10 @@ storage:
     password: ""  # Set password if Redis requires authentication
 
 llm_providers:
-  - id: "openai-prod"
+  - id: "openai"
     type: "openai"
-    api_keys: ["${OPENAI_KEY_1}", "${OPENAI_KEY_2}"]
-    base_url: "https://api.openai.com"
+    api_keys: ["${OPENAI_API_KEY}"]
+    base_url: "https://api.openai.com/v1"
     model: "gpt-4o"
     pricing:
       input_token_cost: 0.002
@@ -36,10 +36,10 @@ llm_providers:
     limits:
       req_per_min: 200
       tokens_per_min: 100000
-  - id: "gemini-prod"
+  - id: "gemini"
     type: "gemini"
-    api_keys: ["${GEMINI_KEY_1}"]
-    base_url: "https://generativelanguage.googleapis.com"
+    api_keys: ["${GEMINI_API_KEY}"]
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
     model: "gemini-1.5-pro"
     pricing:
       input_token_cost: 0.00025
@@ -47,52 +47,45 @@ llm_providers:
     limits:
       req_per_min: 150
       tokens_per_min: 80000
-  - id: "claude-prod"
+  - id: "claude"
     type: "claude"
-    api_keys: ["${CLAUDE_KEY_1}"]
+    api_keys: ["${CLAUDE_API_KEY}"]
     base_url: "https://api.anthropic.com"
-    model: "claude-3-opus"
+    model: "claude-3-opus-20240229"
     pricing:
       input_token_cost: 0.015
       output_token_cost: 0.075
     limits:
       req_per_min: 100
       tokens_per_min: 60000
-  - id: "custom-dev"
-    type: "custom"
-    api_keys: ["${CUSTOM_KEY_1}"]
-    base_url: "https://custom-llm.example.com"
-    model: "custom-model"
-    pricing:
-      input_token_cost: 0.001
-      output_token_cost: 0.002
-    limits:
-      req_per_min: 50
-      tokens_per_min: 10000
 
 api_keys:
-  - key: "test-key"
+  - key: "${API_KEY}"
     allowed_providers: ["*"]  # Access all providers
-    description: "Development test key"
-  - key: "openai-only"
-    allowed_providers: ["openai-prod"]
-    description: "OpenAI production access only"
-  - key: "gemini-only"
-    allowed_providers: ["gemini-prod"]
-    description: "Gemini production access only"
-  - key: "premium"
-    allowed_providers: ["openai-prod", "claude-prod"]
-    description: "Premium access to OpenAI and Claude production"
-  - key: "dev-access"
-    allowed_providers: ["custom-dev"]
-    description: "Development access to custom provider"
+    description: "Default API key for all providers"
 
 model_aliases:
-  gpt-4o: openai-prod:gpt-4o
-  gemini-1.5-pro: gemini-prod:gemini-1.5-pro
-  gemini-2.5-flash: gemini-prod:gemini-2.5-flash
-  claude-3-opus: claude-prod:claude-3-opus
-  custom-model: custom-dev:custom-model
+  # OpenAI models
+  gpt-4o: openai:gpt-4o
+  gpt-4o-mini: openai:gpt-4o-mini
+  gpt-4-turbo: openai:gpt-4-turbo
+  gpt-4: openai:gpt-4
+  gpt-3.5-turbo: openai:gpt-3.5-turbo
+  gpt-3.5-turbo-instruct: openai:gpt-3.5-turbo-instruct
+  # Gemini models
+  gemini-1.5-pro: gemini:gemini-1.5-pro
+  gemini-2.0-pro: gemini:gemini-2.0-pro
+  gemini-2.0-flash: gemini:gemini-2.0-flash
+  gemini-2.5-pro: gemini:gemini-2.5-pro
+  gemini-2.5-flash: gemini:gemini-2.5-flash
+  # Claude models
+  claude-3-opus: claude:claude-3-opus-20240229
+  claude-3-sonnet: claude:claude-3-sonnet-20240229
+  claude-3-haiku: claude:claude-3-haiku-20240307
+  claude-3-5-sonnet: claude:claude-3-5-sonnet-20240620
+  opus-4.1: claude:opus-4.1
+  sonnet-4.5: claude:sonnet-4.5
+  haiku-3.5: claude:haiku-3.5
 
 policy:
   strategy: "hybrid"
@@ -109,5 +102,5 @@ policy:
     timeout: "30s"       # Timeout per attempt
     interval: "1s"       # Interval between retries
   cache:
-     enabled: true        # Enable response caching
-     ttl_seconds: 10      # Cache TTL (10 seconds)
+    enabled: true        # Enable response caching
+    ttl_seconds: 10      # Cache TTL (10 seconds)

@@ -11,110 +11,63 @@ This document describes the high-level architecture of COO-LLM, including compon
 
 COO-LLM follows a modular, plugin-based architecture designed for extensibility and maintainability. The system is built in Go and uses a layered architecture pattern.
 
-```
-flowchart TD
+```mermaid
+graph LR
      A[Client Apps] --> B[API Layer]
      B --> C[Load Balancer]
      C --> D[Providers]
      D --> E[LLM APIs]
 ```
 
+**Detail:**
 
+```mermaid
+flowchart TD
+    classDef client fill:#28a745,color:#fff,stroke:#fff,stroke-width:2px
+    classDef api fill:#28a745,color:#fff,stroke:#fff,stroke-width:2px
+    classDef balancer fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
+    classDef provider fill:#ffc107,color:#000,stroke:#000,stroke-width:2px
+    classDef external fill:#007bff,color:#fff,stroke:#fff,stroke-width:2px
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Client Applications                      │
-│  (OpenAI SDK, LangChain, Custom Clients)                    │
-└─────────────────────┬───────────────────────────────────────┘
-                       │
-┌─────────────────────▼───────────────────────────────────────┐
-│                    API Layer (internal/api)                 │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ OpenAI-Compatible Endpoints (/v1/*)                 │    │
-│  │ - POST /v1/chat/completions (with auth middleware)  │    │
-│  │ - GET /v1/models                                    │    │
-│  └─────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Admin API (/admin/v1/*)                             │    │
-│  │ - Configuration management                          │    │
-│  │ - Provider status                                    │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────┬───────────────────────────────────────┘
-                       │
-┌─────────────────────▼───────────────────────────────────────┐
-│                 Load Balancer (internal/balancer)           │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Selector (selector.go)                              │    │
-│  │ - Model alias resolution                            │    │
-│  │ - Provider/key selection algorithms                 │    │
-│  │ - Round Robin, Least Loaded, Hybrid scoring         │    │
-│  └─────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Usage Tracking                                      │    │
-│  │ - Request counts, token usage, errors, latency     │    │
-│  │ - Rate limit checking                               │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────┬───────────────────────────────────────┘
-                       │
-┌─────────────────────▼───────────────────────────────────────┐
-│                 Provider Registry (internal/provider)       │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Provider Interface (interface.go)                  │    │
-│  │ - Generate(ctx, req) method                         │    │
-│  │ - ListModels(ctx) method                            │    │
-│  └─────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Provider Implementations                            │    │
-│  │ - OpenAI (openai.go)                                │    │
-│  │ - Gemini (gemini.go)                                │    │
-│  │ - Claude (claude.go)                                │    │
-│  │ - Custom (custom.go)                                │    │
-│  └─────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Registry (registry.go)                              │    │
-│  │ - Load providers from config                        │    │
-│  │ - Provider registration and lookup                  │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────┬───────────────────────────────────────┘
-                       │
-┌─────────────────────▼───────────────────────────────────────┐
-│                 Storage & Observability                      │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Runtime Storage (internal/store)                    │    │
-│  │ - Redis (production)                                │    │
-│  │ - Memory (development)                              │    │
-│  │ - HTTP API (remote)                                 │    │
-│  │ - File-based                                        │    │
-│  └─────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Configuration (internal/config)                     │    │
-│  │ - YAML parsing with viper                           │    │
-│  │ - Environment variable substitution                 │    │
-│  │ - Validation and defaults                           │    │
-│  └─────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Logging (internal/log)                              │    │
-│  │ - Structured JSON logging (Zerolog)                │    │
-│  │ - File output with rotation                         │    │
-│  │ - Prometheus metrics                                │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────┬───────────────────────────────────────┘
-                       │
-┌─────────────────────▼───────────────────────────────────────┐
-│              External LLM Providers                         │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ OpenAI API (GPT-4, GPT-3.5)                         │    │
-│  └─────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Google Gemini API (1.5 Pro, etc.)                  │    │
-│  └─────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Anthropic Claude API (Opus, Sonnet)                │    │
-│  └─────────────────────────────────────────────────────┘    │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │ Custom LLM APIs                                     │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
+    A[Client Applications<br/>OpenAI SDK, LangChain, Custom Clients]:::client
+    A --> B[API Layer<br/>internal/api]:::api
+
+    subgraph B["API Layer  <internal/api >"]
+        B1[OpenAI-Compatible Endpoints<br/>/v1/*<br/>POST /v1/chat/completions<br/>GET /v1/models]:::api
+        B2[Admin API<br/>/admin/v1/*<br/>Configuration management<br/>Provider status]:::api
+    end
+
+    B --> C[Load Balancer<br/>internal/balancer]:::balancer
+
+    subgraph C["Load Balancer  <internal/balancer >"]
+        C1[Selector<br/>selector.go<br/>Model alias resolution<br/>Provider/key selection<br/>Round Robin, Least Loaded, Hybrid]:::balancer
+        C2[Usage Tracking<br/>Request counts, token usage<br/>Errors, latency<br/>Rate limit checking]:::balancer
+    end
+
+    C --> D[Provider Registry<br/>internal/provider]:::provider
+
+    subgraph D["Provider Registry  <internal/provider >"]
+        D1[Provider Interface<br/>interface.go<br/>Generate<ctx, req> method<br/>ListModels <ctx > method]:::provider
+        D2[Provider Implementations<br/>OpenAI  <openai.go ><br/>Gemini  <gemini.go ><br/>Claude  <claude.go ><br/>Custom  <custom.go >]:::provider
+        D3[Registry<br/>registry.go<br/>Load providers from config<br/>Provider registration and lookup]:::provider
+    end
+
+    D --> E[Storage & Observability]:::storage
+
+    subgraph E["Storage & Observability"]
+        E1[Runtime Storage<br/>internal/store<br/>Redis, Memory, HTTP, File]:::storage
+        E2[Configuration<br/>internal/config<br/>YAML parsing with viper<br/>Environment variables<br/>Validation]:::storage
+        E3[Logging<br/>internal/log<br/>Structured JSON  <Zerolog ><br/>File rotation<br/>Prometheus metrics]:::storage
+    end
+
+    E --> F[External LLM Providers]:::external
+
+    subgraph F["External LLM Providers"]
+        F1[OpenAI API<br/>GPT-4, GPT-3.5]:::external
+        F2[Google Gemini API<br/>1.5 Pro, etc.]:::external
+        F3[Anthropic Claude API<br/>Opus, Sonnet]:::external
+        F4[Custom LLM APIs]:::external
+    end
 ```
 
 ## Core Components

@@ -7,13 +7,38 @@ tags: [user-guide, configuration]
 
 COO-LLM uses YAML configuration files for all settings. The configuration is hierarchical and supports environment variable substitution, validation, and hot-reload.
 
+## Configuration Loading Flow
+
+```mermaid
+flowchart TD
+    classDef input fill:#28a745,color:#fff,stroke:#fff,stroke-width:2px
+    classDef process fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
+    classDef storage fill:#007bff,color:#fff,stroke:#fff,stroke-width:2px
+    classDef decision fill:#ffc107,color:#000,stroke:#000,stroke-width:2px
+
+    A[Application Start]:::input
+    A --> B[Load YAML Config<br/>config.yaml]:::process
+    B --> C[Environment Variable<br/>Substitution<br/>VAR]:::process
+    C --> D[Validate Configuration<br/>Required fields, types]:::process
+    D --> E{Valid?}:::decision
+
+    E -->|No| F[Log Error<br/>Exit Application]:::process
+    E -->|Yes| G[Initialize Components<br/>Providers, Storage, Logging]:::process
+    G --> H[Load Model Aliases<br/>Map aliases to providers]:::process
+    H --> I[Start HTTP Server<br/>Ready for requests]:::process
+
+    D --> J[Parse Providers<br/>OpenAI, Gemini, Claude]:::storage
+    D --> K[Parse API Keys<br/>With permissions]:::storage
+    D --> L[Parse Policies<br/>Algorithm, weights]:::storage
+```
+
 ## Configuration File Structure
 
 ```yaml
 version: "1.0"
 
 server:
-  listen: ":8080"
+   listen: ":2906"
   admin_api_key: "admin-secret"
 
 logging:
@@ -37,67 +62,64 @@ storage:
     api_key: ""
 
 llm_providers:
-  - id: "openai-prod"
-    type: "openai"
-    api_keys: ["${OPENAI_KEY_1}", "${OPENAI_KEY_2}"]
-    base_url: "https://api.openai.com"
-    model: "gpt-4o"
-    pricing:
-      input_token_cost: 0.002
-      output_token_cost: 0.01
-    limits:
-      req_per_min: 200
-      tokens_per_min: 100000
-  - id: "gemini-prod"
-    type: "gemini"
-    api_keys: ["${GEMINI_KEY_1}"]
-    base_url: "https://generativelanguage.googleapis.com"
-    model: "gemini-1.5-pro"
-    pricing:
-      input_token_cost: 0.00025
-      output_token_cost: 0.0005
-    limits:
-      req_per_min: 150
-      tokens_per_min: 80000
-  - id: "claude-prod"
-    type: "claude"
-    api_keys: ["${CLAUDE_KEY_1}"]
-    base_url: "https://api.anthropic.com"
-    model: "claude-3-opus"
-    pricing:
-      input_token_cost: 0.015
-      output_token_cost: 0.075
-    limits:
-      req_per_min: 100
-      tokens_per_min: 60000
-  - id: "custom-dev"
-    type: "custom"
-    api_keys: ["${CUSTOM_KEY_1}"]
-    base_url: "https://custom-llm.example.com"
-    model: "custom-model"
-    pricing:
-      input_token_cost: 0.001
-      output_token_cost: 0.002
-    limits:
-      req_per_min: 50
-      tokens_per_min: 10000
+   - id: "openai"
+     type: "openai"
+     api_keys: ["${OPENAI_API_KEY}"]
+     base_url: "https://api.openai.com/v1"
+     model: "gpt-4o"
+     pricing:
+       input_token_cost: 0.002
+       output_token_cost: 0.01
+     limits:
+       req_per_min: 200
+       tokens_per_min: 100000
+   - id: "gemini"
+     type: "gemini"
+     api_keys: ["${GEMINI_API_KEY}"]
+     base_url: "https://generativelanguage.googleapis.com/v1beta"
+     model: "gemini-1.5-pro"
+     pricing:
+       input_token_cost: 0.00025
+       output_token_cost: 0.0005
+     limits:
+       req_per_min: 150
+       tokens_per_min: 80000
+   - id: "claude"
+     type: "claude"
+     api_keys: ["${CLAUDE_API_KEY}"]
+     base_url: "https://api.anthropic.com"
+     model: "claude-3-opus-20240229"
+     pricing:
+       input_token_cost: 0.015
+       output_token_cost: 0.075
+     limits:
+       req_per_min: 100
+       tokens_per_min: 60000
 
 api_keys:
-  - key: "test-key"
-    allowed_providers: ["*"]  # Access all providers
-    description: "Development test key"
-  - key: "openai-only"
-    allowed_providers: ["openai-prod"]
-    description: "OpenAI production access only"
-  - key: "premium"
-    allowed_providers: ["openai-prod", "claude-prod"]
-    description: "Premium access to OpenAI and Claude"
+   - key: "default-key"
+     allowed_providers: ["*"]  # Access all providers
+     description: "Default API key for all providers"
 
 model_aliases:
-  gpt-4o: openai-prod:gpt-4o
-  gemini-1.5-pro: gemini-prod:gemini-1.5-pro
-  claude-3-opus: claude-prod:claude-3-opus
-  custom-model: custom-dev:custom-model
+   # OpenAI models
+   gpt-4o: openai:gpt-4o
+   gpt-4o-mini: openai:gpt-4o-mini
+   gpt-4-turbo: openai:gpt-4-turbo
+   gpt-4: openai:gpt-4
+   gpt-3.5-turbo: openai:gpt-3.5-turbo
+   gpt-3.5-turbo-instruct: openai:gpt-3.5-turbo-instruct
+   # Gemini models
+   gemini-1.5-pro: gemini:gemini-1.5-pro
+   gemini-1.5-flash: gemini:gemini-1.5-flash
+   gemini-1.0-pro: gemini:gemini-1.0-pro
+   gemini-2.0-flash-exp: gemini:gemini-2.0-flash-exp
+   gemini-2.0-pro-exp: gemini:gemini-2.0-pro-exp
+   # Claude models
+   claude-3-opus: claude:claude-3-opus-20240229
+   claude-3-sonnet: claude:claude-3-sonnet-20240229
+   claude-3-haiku: claude:claude-3-haiku-20240307
+   claude-3-5-sonnet: claude:claude-3-5-sonnet-20240620
 
 policy:
   strategy: "hybrid"

@@ -21,7 +21,6 @@ const (
 	ProviderOpenAI ProviderType = "openai"
 	ProviderGemini ProviderType = "gemini"
 	ProviderClaude ProviderType = "claude"
-	ProviderCustom ProviderType = "custom"
 )
 
 // LLMConfig holds configuration for LLM providers
@@ -94,8 +93,6 @@ func NewLLMProvider(config LLMConfig) (LLMProvider, error) {
 		return NewGeminiProvider(config), nil
 	case ProviderClaude:
 		return NewClaudeProvider(config), nil
-	case ProviderCustom:
-		return NewCustomProvider(config), nil
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", config.Type)
 	}

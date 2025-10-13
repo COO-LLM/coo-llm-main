@@ -7,6 +7,41 @@ tags: [user-guide, providers]
 
 COO-LLM supports multiple LLM providers through a plugin-based architecture. Each provider implements a common interface for seamless integration.
 
+## Provider Architecture
+
+```mermaid
+flowchart TD
+    classDef interface fill:#ffc107,color:#000,stroke:#000,stroke-width:2px
+    classDef provider fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
+    classDef registry fill:#ffc107,color:#000,stroke:#000,stroke-width:2px
+    classDef external fill:#007bff,color:#fff,stroke:#fff,stroke-width:2px
+
+    A[LLMProvider Interface<br/>interface.go]:::interface
+    A --> C[ListModels<ctx><br/> Array<string>]:::interface
+    A --> B[Generate <ctx, req> <br/>LLMRequest → LLMResponse]:::interface
+
+    D[Provider Registry<br/>registry.go]:::registry
+    D --> E[Load from Config<br/>llm_providers]:::registry
+    D --> F[Provider Instances<br/>OpenAI, Gemini, Claude]:::registry
+
+    G[OpenAI Provider<br/>openai.go]:::provider
+    G --> H[OpenAI API<br/>chat/completions]:::external
+
+    I[Gemini Provider<br/>gemini.go]:::provider
+    I --> J[Gemini API<br/>generateContent]:::external
+
+    K[Claude Provider<br/>claude.go]:::provider
+    K --> L[Claude API<br/>messages]:::external
+
+    B --> G
+    B --> I
+    B --> K
+
+    E --> G
+    E --> I
+    E --> K
+```
+
 ## Supported Providers
 
 ### OpenAI
@@ -67,7 +102,9 @@ llm_providers:
 **Supported Models:**
 - `gemini-1.5-pro`
 - `gemini-1.5-flash`
-- `gemini-pro`
+- `gemini-1.0-pro`
+- `gemini-2.0-flash-exp`
+- `gemini-2.0-pro-exp`
 
 **Features:**
 - Chat completions
@@ -109,27 +146,31 @@ llm_providers:
 
 **Rate Limits:** Varies by model (see [Anthropic docs](https://docs.anthropic.com/claude/docs/rate-limits))
 
-### Custom Provider
+## Using Custom Endpoints
 
-**Provider Type:** `custom`
+For models that follow OpenAI, Gemini, or Claude API standards, you can use the respective provider type and specify a custom `base_url`:
 
-**Configuration:**
 ```yaml
 llm_providers:
-  - id: "custom-dev"
-    type: "custom"
-    api_keys: ["${CUSTOM_KEY_1}"]
-    base_url: "https://custom-llm.example.com"
-    model: "custom-model"
+  - id: "custom-openai-compatible"
+    type: "openai"  # Use openai type for OpenAI-compatible APIs
+    api_keys: ["${CUSTOM_KEY}"]
+    base_url: "https://your-custom-endpoint.com/v1"  # Custom URL
+    model: "your-model"
     pricing:
       input_token_cost: 0.001
       output_token_cost: 0.002
     limits:
-      req_per_min: 50
-      tokens_per_min: 10000
+      req_per_min: 100
+      tokens_per_min: 50000
 ```
 
-**Use Case:** Integrate with proprietary or custom LLM APIs
+**Supported Types for Custom Endpoints:**
+- `openai`: For OpenAI-compatible APIs
+- `gemini`: For Gemini-compatible APIs
+- `claude`: For Claude-compatible APIs
+
+If your model doesn't follow these standards, consider using the official SDKs directly or contributing a new provider implementation.
 
 ## Provider Interface
 
