@@ -1,9 +1,14 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
+import BrowserOnly from '@docusaurus/BrowserOnly';
 
 export default function Home() {
-  useEffect(() => {
-    window.location.href = '/docs/Intro/Overview';
-  }, []);
-  return null;
+  return (
+    <BrowserOnly>
+      {() => {
+        window.location.href = 'https://coo-llm.github.io';
+        return null;
+      }}
+    </BrowserOnly>
+  );
 }
