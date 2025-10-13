@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GEMINI_KEY_1: ${{ secrets.GEMINI_KEY_1 }}
-
     steps:
     - uses: actions/checkout@v4
 
