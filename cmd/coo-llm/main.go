@@ -16,9 +16,17 @@ import (
 	"github.com/user/coo-llm/internal/store"
 )
 
+var version = "dev"
+
 func main() {
 	configPath := flag.String("config", "configs/config.yaml", "path to config file")
+	versionFlag := flag.Bool("version", false, "show version")
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Println(version)
+		os.Exit(0)
+	}
 
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {

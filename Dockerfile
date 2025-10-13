@@ -1,9 +1,10 @@
 FROM golang:1.23-alpine AS builder
+ARG VERSION=dev
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o coo-llm ./cmd/coo-llm
+RUN go build -ldflags "-X main.version=$VERSION" -o coo-llm ./cmd/coo-llm
 
 FROM alpine:3.19
 RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
