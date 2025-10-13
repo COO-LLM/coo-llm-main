@@ -16,14 +16,15 @@ type Logger struct {
 }
 
 type LogEntry struct {
-	Timestamp string `json:"timestamp"`
-	Provider  string `json:"provider"`
-	Model     string `json:"model"`
-	ReqID     string `json:"req_id"`
-	LatencyMS int64  `json:"latency_ms"`
-	Status    int    `json:"status"`
-	Tokens    int    `json:"tokens"`
-	Error     string `json:"error,omitempty"`
+	Timestamp string  `json:"timestamp"`
+	Provider  string  `json:"provider"`
+	Model     string  `json:"model"`
+	ReqID     string  `json:"req_id"`
+	LatencyMS int64   `json:"latency_ms"`
+	Status    int     `json:"status"`
+	Tokens    int     `json:"tokens"`
+	Cost      float64 `json:"cost"`
+	Error     string  `json:"error,omitempty"`
 }
 
 func NewLogger(cfg *config.Logging) *Logger {

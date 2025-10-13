@@ -15,7 +15,7 @@ func TestFileStore(t *testing.T) {
 	configContent := `
 version: "1.0"
 server:
-  listen: ":8080"
+  listen: ":2906"
 llm_providers:
   - type: "openai"
     api_keys: ["sk-test"]

@@ -172,6 +172,9 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Calculate cost
+	cost := (float64(resp.InputTokens)*key.Pricing.InputTokenCost + float64(resp.OutputTokens)*key.Pricing.OutputTokenCost) / 1000000
+
 	// Log the request
 	reqID := fmt.Sprintf("%d", time.Now().UnixNano())
 	h.logger.LogRequest(r.Context(), &log.LogEntry{
@@ -181,6 +184,7 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 		LatencyMS: latency,
 		Status:    200,
 		Tokens:    resp.TokensUsed,
+		Cost:      cost,
 		Error:     "",
 	})
 
@@ -200,10 +204,11 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 				"finish_reason": resp.FinishReason,
 			},
 		},
-		"usage": map[string]int{
+		"usage": map[string]interface{}{
 			"prompt_tokens":     resp.InputTokens,
 			"completion_tokens": resp.OutputTokens,
 			"total_tokens":      resp.TokensUsed,
+			"cost":              cost,
 		},
 	}
 

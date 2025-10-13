@@ -5,7 +5,7 @@ Demo testing COO-LLM compatibility with LangChain.js
 ## Prerequisites
 
 - Node.js >= 18.0.0
-- COO-LLM server running on `http://localhost:8080`
+- COO-LLM server running on `http://localhost:2906`
 
 ## Setup
 
@@ -62,6 +62,6 @@ Usage: { input_tokens: X, output_tokens: Y, total_tokens: Z }
 
 ## Troubleshooting
 
-- **ECONNREFUSED**: Make sure COO-LLM server is running on port 8080
+- **ECONNREFUSED**: Make sure COO-LLM server is running on port 2906
 - **API Key errors**: COO-LLM ignores the API key, but LangChain requires one
 - **Model not found**: Check that the model is configured in COO-LLM config

@@ -111,8 +111,7 @@ Generate chat completions using available models. This is the primary endpoint i
   "usage": {
     "prompt_tokens": 13,
     "completion_tokens": 7,
-    "total_tokens": 20,
-    "cost": 0.000036
+    "total_tokens": 20
   }
 }
 ```
@@ -129,8 +128,7 @@ Generate chat completions using available models. This is the primary endpoint i
 - ✅ Automatic provider selection and load balancing
 - ✅ Rate limiting and retry logic
 - ✅ Response caching (if enabled)
-- ✅ Usage tracking and cost calculation
-- ✅ Comprehensive logging
+- ✅ Usage tracking and metrics
 
 ### GET /v1/models
 

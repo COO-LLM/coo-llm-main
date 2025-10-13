@@ -18,17 +18,14 @@ logging:
 storage:
   config:
     type: "file"
-    path: "./configs/config.yaml"
+    path: "./data/config.json"
   runtime:
-    type: "redis"  # Redis for production (persistent storage, rate limiting)
-    addr: "localhost:6379"
-    password: ""  # Set password if Redis requires authentication
+    type: "memory" 
 
 llm_providers:
   - id: "openai"
     type: "openai"
     api_keys: ["${OPENAI_API_KEY}"]
-    base_url: "https://api.openai.com/v1"
     model: "gpt-4o"
     pricing:
       input_token_cost: 0.002
@@ -39,7 +36,6 @@ llm_providers:
   - id: "gemini"
     type: "gemini"
     api_keys: ["${GEMINI_API_KEY}"]
-    base_url: "https://generativelanguage.googleapis.com/v1beta"
     model: "gemini-1.5-pro"
     pricing:
       input_token_cost: 0.00025

@@ -12,7 +12,7 @@ async function main() {
     openAIApiKey: 'test-12', // Valid API key for COO-LLM server
     temperature: 0.7,
     configuration: {
-      baseURL: 'http://localhost:8080/v1', // Point to our COO-LLM server
+      baseURL: 'http://localhost:2906/v1', // Point to our COO-LLM server
     },
   });
 
@@ -53,7 +53,7 @@ async function main() {
     console.error('Full error:', error);
 
     if (error.message.includes('ECONNREFUSED')) {
-      console.log('\n💡 Make sure COO-LLM server is running on http://localhost:8080');
+      console.log('\n💡 Make sure COO-LLM server is running on http://localhost:2906');
       console.log('   Run: go run cmd/coo-llm/main.go');
     }
   }

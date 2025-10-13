@@ -3,7 +3,7 @@ services:
   coo-llm:
     build: .
     ports:
-      - "8080:8080"
+      - "2906:2906"
     environment:
       - CONFIG_PATH=/app/configs/config.yaml
     depends_on:

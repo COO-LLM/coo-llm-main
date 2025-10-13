@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: coo-llm
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
@@ -99,15 +99,14 @@ jobs:
           ## What's Changed
 
           ### Docker Images
-          - `docker pull ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}:${{ steps.get_version.outputs.version }}`
-          - `docker pull ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}:latest`
-
+          - `docker pull ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.get_version.outputs.version }}`
+          - `docker pull ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest`
           ### Installation
           ```bash
           # Use Docker
           docker run -p 8080:8080 \
             -e OPENAI_API_KEY="your-key" \
-            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}:${{ steps.get_version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.get_version.outputs.version }}
           ```
 
           For more information, see the [documentation](https://coo-llm.github.io/coo-llm-main/).

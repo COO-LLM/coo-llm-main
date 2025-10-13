@@ -38,8 +38,8 @@ flowchart TD
 version: "1.0"
 
 server:
-  listen: ":2906"
-  admin_api_key: "${ADMIN_API_KEY}"
+   listen: ":2906"
+  admin_api_key: "admin-secret"
 
 logging:
   file:
@@ -50,80 +50,81 @@ logging:
   prometheus:
     enabled: true
     endpoint: "/metrics"
-  providers: []
 
 storage:
   config:
     type: "file"
-    path: "./data/config.json"
+    path: "./configs/config.yaml"
   runtime:
-    type: "memory" 
+    type: "redis"  # redis, memory, http, file
+    addr: "localhost:6379"
+    password: ""
+    api_key: ""
 
 llm_providers:
-  - id: "openai"
-    type: "openai"
-    api_keys: ["${OPENAI_API_KEY}"]
-    model: "gpt-4o"
-    pricing:
-      input_token_cost: 0.002
-      output_token_cost: 0.01
-    limits:
-      req_per_min: 200
-      tokens_per_min: 100000
-  - id: "gemini"
-    type: "gemini"
-    api_keys: ["${GEMINI_API_KEY}"]
-    model: "gemini-1.5-pro"
-    pricing:
-      input_token_cost: 0.00025
-      output_token_cost: 0.0005
-    limits:
-      req_per_min: 150
-      tokens_per_min: 80000
-  - id: "claude"
-    type: "claude"
-    api_keys: ["${CLAUDE_API_KEY}"]
-    base_url: "https://api.anthropic.com"
-    model: "claude-3-opus-20240229"
-    pricing:
-      input_token_cost: 0.015
-      output_token_cost: 0.075
-    limits:
-      req_per_min: 100
-      tokens_per_min: 60000
+   - id: "openai"
+     type: "openai"
+     api_keys: ["${OPENAI_API_KEY}"]
+     base_url: "https://api.openai.com/v1"
+     model: "gpt-4o"
+     pricing:
+       input_token_cost: 0.002
+       output_token_cost: 0.01
+     limits:
+       req_per_min: 200
+       tokens_per_min: 100000
+   - id: "gemini"
+     type: "gemini"
+     api_keys: ["${GEMINI_API_KEY}"]
+     base_url: "https://generativelanguage.googleapis.com/v1beta"
+     model: "gemini-1.5-pro"
+     pricing:
+       input_token_cost: 0.00025
+       output_token_cost: 0.0005
+     limits:
+       req_per_min: 150
+       tokens_per_min: 80000
+   - id: "claude"
+     type: "claude"
+     api_keys: ["${CLAUDE_API_KEY}"]
+     base_url: "https://api.anthropic.com"
+     model: "claude-3-opus-20240229"
+     pricing:
+       input_token_cost: 0.015
+       output_token_cost: 0.075
+     limits:
+       req_per_min: 100
+       tokens_per_min: 60000
 
 api_keys:
-  - key: "${API_KEY}"
-    allowed_providers: ["*"]  # Access all providers
-    description: "Default API key for all providers"
+   - key: "default-key"
+     allowed_providers: ["*"]  # Access all providers
+     description: "Default API key for all providers"
 
 model_aliases:
-  # OpenAI models
-  gpt-4o: openai:gpt-4o
-  gpt-4o-mini: openai:gpt-4o-mini
-  gpt-4-turbo: openai:gpt-4-turbo
-  gpt-4: openai:gpt-4
-  gpt-3.5-turbo: openai:gpt-3.5-turbo
-  gpt-3.5-turbo-instruct: openai:gpt-3.5-turbo-instruct
-  # Gemini models
-  gemini-1.5-pro: gemini:gemini-1.5-pro
-  gemini-2.0-pro: gemini:gemini-2.0-pro
-  gemini-2.0-flash: gemini:gemini-2.0-flash
-  gemini-2.5-pro: gemini:gemini-2.5-pro
-  gemini-2.5-flash: gemini:gemini-2.5-flash
-  # Claude models
-  claude-3-opus: claude:claude-3-opus-20240229
-  claude-3-sonnet: claude:claude-3-sonnet-20240229
-  claude-3-haiku: claude:claude-3-haiku-20240307
-  claude-3-5-sonnet: claude:claude-3-5-sonnet-20240620
-  opus-4.1: claude:opus-4.1
-  sonnet-4.5: claude:sonnet-4.5
-  haiku-3.5: claude:haiku-3.5
+   # OpenAI models
+   gpt-4o: openai:gpt-4o
+   gpt-4o-mini: openai:gpt-4o-mini
+   gpt-4-turbo: openai:gpt-4-turbo
+   gpt-4: openai:gpt-4
+   gpt-3.5-turbo: openai:gpt-3.5-turbo
+   gpt-3.5-turbo-instruct: openai:gpt-3.5-turbo-instruct
+   # Gemini models
+   gemini-1.5-pro: gemini:gemini-1.5-pro
+   gemini-1.5-flash: gemini:gemini-1.5-flash
+   gemini-1.0-pro: gemini:gemini-1.0-pro
+   gemini-2.0-flash-exp: gemini:gemini-2.0-flash-exp
+   gemini-2.0-pro-exp: gemini:gemini-2.0-pro-exp
+   # Claude models
+   claude-3-opus: claude:claude-3-opus-20240229
+   claude-3-sonnet: claude:claude-3-sonnet-20240229
+   claude-3-haiku: claude:claude-3-haiku-20240307
+   claude-3-5-sonnet: claude:claude-3-5-sonnet-20240620
 
 policy:
   strategy: "hybrid"
-  algorithm: "hybrid"   # "round_robin", "least_loaded", "hybrid"
-  priority: "balanced"  # "balanced", "cost", "req", "token" (auto-sets weights)
+  algorithm: "hybrid"   # round_robin, least_loaded, hybrid
+  priority: "balanced"  # balanced, cost, req, token (auto-sets weights)
   hybrid_weights:       # Auto-set based on priority, or customize
     token_ratio: 0.2
     req_ratio: 0.2
@@ -179,28 +180,18 @@ Array of log provider configurations:
 ### Storage Configuration
 
 #### Config Storage
-Used for dynamic config loading/saving (not currently implemented).
-
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `type` | string | `file` | Storage type (`file`, `http`) |
-| `path` | string | `./data/config.json` | File path (for file type) |
+| `path` | string | `./configs/config.yaml` | File path (for file type) |
 
 #### Runtime Storage
-Used for caching, sessions, and runtime data.
-
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `type` | string | `memory` | Storage type (`memory`, `redis`, `file`, `http`) |
-| `addr` | string | `localhost:6379` | Redis address or HTTP endpoint (for redis/http) |
+| `type` | string | `redis` | Storage type (`redis`, `file`, `http`) |
+| `addr` | string | `localhost:6379` | Redis address or HTTP endpoint |
 | `password` | string | - | Redis password |
 | `api_key` | string | - | API key for HTTP storage |
-
-**Storage Types:**
-- `memory`: In-memory storage (fast, not persistent)
-- `file`: File-based storage (persistent, local)
-- `redis`: Redis database (persistent, distributed)
-- `http`: HTTP endpoint storage (remote API)
 
 ### LLM Provider Configuration
 
@@ -346,9 +337,6 @@ logging:
     enabled: true
 
 storage:
-  config:
-    type: "file"
-    path: "./data/config.json"
   runtime:
     type: "redis"
     addr: "redis:6379"

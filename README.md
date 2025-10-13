@@ -126,15 +126,15 @@ docker run -p 2906:2906 \
 docker run -p 2906:2906 \
   -e OPENAI_API_KEY="sk-your-key" \
   -v $(pwd)/configs:/app/configs \
-  your-dockerhub-username/coo-llm:latest
+  khapu2906/coo-llm:latest
 
 # Or use docker-compose
 docker-compose up -d
 ```
 
 **Docker Hub Images:**
-- `your-dockerhub-username/coo-llm:latest` - Latest development build
-- `your-dockerhub-username/coo-llm:v1.0.0` - Specific version tags
+- `khapu2906/coo-llm:latest` - Latest development build
+- `khapu2906/coo-llm:v1.0.0` - Specific version tags
 
 ### 🧠 LangChain Integration
 
@@ -211,8 +211,8 @@ To create a new release:
 **Example Release:**
 ```bash
 # After CI/CD completes, users can:
-docker pull your-dockerhub-username/coo-llm:v1.0.0
-docker run -p 8080:8080 your-dockerhub-username/coo-llm:v1.0.0
+docker pull khapu2906/coo-llm:v1.0.0
+docker run -p 2906:2906 khapu2906/coo-llm:v1.0.0
 ```
 
 ### Docker Hub Integration
@@ -221,7 +221,7 @@ The CI/CD pipeline automatically builds and pushes multi-platform Docker images:
 
 - **Tags**: `latest`, `v1.0.0`, etc.
 - **Platforms**: Linux AMD64, ARM64
-- **Registry**: `docker.io/your-dockerhub-username/coo-llm`
+- **Registry**: `docker.io/khapu2906/coo-llm`
 
 **Setup Docker Hub Access:**
 
@@ -231,7 +231,7 @@ The CI/CD pipeline automatically builds and pushes multi-platform Docker images:
    - `DOCKERHUB_USERNAME`: Your Docker Hub username
    - `DOCKERHUB_TOKEN`: Your Docker Hub access token
 
-**Update the workflow** to use your Docker Hub username by replacing `your-dockerhub-username` in the workflow file.
+**Update the workflow** to use your Docker Hub username by replacing `khapu2906` in the workflow file.
 
 ### Development Workflow
 

@@ -13,7 +13,7 @@ func TestLoadConfig(t *testing.T) {
 	configContent := `
 version: "1.0"
 server:
-  listen: ":8080"
+  listen: ":2906"
   admin_api_key: "test"
 llm_providers:
   - type: "openai"
@@ -35,7 +35,7 @@ model_aliases:
 	require.NoError(t, err)
 
 	assert.Equal(t, "1.0", cfg.Version)
-	assert.Equal(t, ":8080", cfg.Server.Listen)
+	assert.Equal(t, ":2906", cfg.Server.Listen)
 	assert.Len(t, cfg.LLMProviders, 1)
 	assert.Equal(t, "openai", cfg.LLMProviders[0].Type)
 	// Should populate Providers from LLMProviders
@@ -46,7 +46,7 @@ model_aliases:
 func TestValidateConfig(t *testing.T) {
 	cfg := &Config{
 		Version:      "1.0",
-		Server:       Server{Listen: ":8080"},
+		Server:       Server{Listen: ":2906"},
 		LLMProviders: []LLMProvider{{Type: "test"}},
 	}
 

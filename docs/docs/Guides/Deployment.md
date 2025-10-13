@@ -119,7 +119,7 @@ flowchart TD
       -e GEMINI_API_KEY="your-gemini-key" \
       -v $(pwd)/configs:/app/configs \
       -v $(pwd)/logs:/app/logs \
-      khapu2906/coo-llm:latest
+      coo-llm:latest
     ```
 
 **Dockerfile details:**
@@ -330,7 +330,7 @@ data:
 version: '3.8'
 services:
   coo-llm:
-    image: khapu2906/coo-llm:latest
+    image: coo-llm:latest
     ports:
       - "2906:2906"
     environment:
