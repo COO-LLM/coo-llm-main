@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -68,7 +69,7 @@ func (m *mockStore) GetCache(key string) (string, error) {
 // Mock provider that simulates external API
 type e2eMockProvider struct{}
 
-func (m *e2eMockProvider) Name() string { return "openai" }
+func (m *e2eMockProvider) Name() string { return "gemini" }
 func (m *e2eMockProvider) Generate(ctx context.Context, req *provider.LLMRequest) (*provider.LLMResponse, error) {
 	// Simulate API delay and response
 	return &provider.LLMResponse{
@@ -78,23 +79,36 @@ func (m *e2eMockProvider) Generate(ctx context.Context, req *provider.LLMRequest
 	}, nil
 }
 func (m *e2eMockProvider) ListModels(ctx context.Context) ([]string, error) {
-	return []string{"gpt-4o", "gpt-4"}, nil
+	return []string{"gemini-1.5-pro"}, nil
 }
 
 func TestE2E_ChatCompletionsFlow(t *testing.T) {
 	// Setup config
+	geminiKey := os.Getenv("GEMINI_KEY_1")
+	if geminiKey == "" {
+		t.Skip("GEMINI_KEY_1 not set, skipping real API test")
+	}
 	cfg := &config.Config{
+		LLMProviders: []config.LLMProvider{
+			{
+				ID:      "gemini",
+				Type:    "gemini",
+				APIKeys: []string{geminiKey},
+				BaseURL: "https://generativelanguage.googleapis.com",
+				Model:   "gemini-2.0-flash-exp",
+			},
+		},
 		Providers: []config.Provider{
 			{
-				ID:      "openai",
-				BaseURL: "https://api.openai.com/v1",
+				ID:      "gemini",
+				BaseURL: "https://generativelanguage.googleapis.com",
 				Keys: []config.Key{
-					{ID: "key1", Secret: "sk-test"},
+					{ID: "key1", Secret: geminiKey},
 				},
 			},
 		},
 		ModelAliases: map[string]string{
-			"gpt-4o": "openai:gpt-4o",
+			"gemini-1.5-flash": "gemini:gemini-1.5-flash",
 		},
 		Policy: config.Policy{Strategy: "round_robin"},
 	}
@@ -117,7 +131,7 @@ func TestE2E_ChatCompletionsFlow(t *testing.T) {
 
 	// Test chat completions request
 	reqBody := map[string]any{
-		"model": "gpt-4o",
+		"model": "gemini-1.5-flash",
 		"messages": []map[string]string{
 			{"role": "user", "content": "Hello"},
 		},
@@ -125,7 +139,11 @@ func TestE2E_ChatCompletionsFlow(t *testing.T) {
 	}
 	body, _ := json.Marshal(reqBody)
 
-	resp, err := http.Post(ts.URL+"/v1/chat/completions", "application/json", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", ts.URL+"/v1/chat/completions", bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-key")
+	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -157,7 +175,10 @@ func TestE2E_ModelsEndpoint(t *testing.T) {
 	ts := httptest.NewServer(r)
 	defer ts.Close()
 
-	resp, err := http.Get(ts.URL + "/v1/models")
+	req, err := http.NewRequest("GET", ts.URL+"/v1/models", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer test-key")
+	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 

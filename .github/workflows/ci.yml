@@ -13,10 +13,12 @@ env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+   test:
+     runs-on: ubuntu-latest
+     env:
+       GEMINI_KEY_1: ${{ secrets.GEMINI_KEY_1 }}
 
-    steps:
+     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Go
