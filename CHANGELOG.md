@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Input Validation**: Enhanced validation for all API inputs
 - **Secure Storage**: Environment variables for all secrets
 
-## [1.0.0] - 2025-10-12
+## [1.0.2] - 2025-10-12
 
 ### Added
 - Initial release of COO-LLM
