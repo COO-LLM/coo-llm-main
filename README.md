@@ -250,14 +250,14 @@ make run            # Run with default config
 
 ## 📚 Documentation
 
-Complete documentation is available in the [docs/docs/](docs/docs/) directory.
+Complete documentation is available in the [docs/content/](docs/content/) directory.
 
 ### Quick Links
-- **[Introduction](docs/docs/Intro/Overview.md)**: Overview and architecture
-- **[Configuration](docs/docs/Guides/Configuration.md)**: Complete configuration reference
-- **[API Reference](docs/docs/Reference/API.md)**: REST API documentation
-- **[Load Balancing](docs/docs/Reference/Balancer.md)**: Load balancing algorithms and policies
-- **[Deployment](docs/docs/Guides/Deployment.md)**: Installation and production deployment
+- **[Introduction](docs/content/Intro/Overview.md)**: Overview and architecture
+- **[Configuration](docs/content/Guides/Configuration.md)**: Complete configuration reference
+- **[API Reference](docs/content/Reference/API.md)**: REST API documentation
+- **[Load Balancing](docs/content/Reference/Balancer.md)**: Load balancing algorithms and policies
+- **[Deployment](docs/content/Guides/Deployment.md)**: Installation and production deployment
 - **[LangChain Demo](langchain-demo/)**: Integration examples
 
 ### Documentation Structure
@@ -384,7 +384,7 @@ storage:
     password: "${REDIS_PASSWORD}"
 ```
 
-See [Configuration Guide](docs/docs/Guides/Configuration.md) for complete options.
+See [Configuration Guide](docs/content/Guides/Configuration.md) for complete options.
 
 ## 🔒 Security
 
@@ -488,7 +488,7 @@ COO-LLM provides **100% OpenAI API compatibility**:
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](docs/docs/Contributing/Guidelines.md) for details.
+We welcome contributions! Please see our [Contributing Guidelines](docs/content/Contributing/Guidelines.md) for details.
 
 ### Development Setup
 ```bash
@@ -522,7 +522,7 @@ This project is licensed under the DIB License v1.0 - see the [LICENSE](LICENSE)
 
 - 🐛 [GitHub Issues](https://github.com/your-org/coo-llm/issues) - Bug reports and feature requests
 - 💬 [Discussions](https://github.com/your-org/coo-llm/discussions) - Questions and general discussion
-- 📖 [Documentation](docs/docs/) - Comprehensive guides and API reference
+- 📖 [Documentation](docs/content/) - Comprehensive guides and API reference
 - 🧪 [LangChain Demo](langchain-demo/) - Integration examples
 
 ## 🏆 Key Highlights

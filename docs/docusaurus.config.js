@@ -11,7 +11,7 @@ const config = {
   url: 'https://coo-llm.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/docs/',
+  baseUrl: '/',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -37,11 +37,12 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
+          path: 'content',
           sidebarPath: './sidebars.js',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/coo-llm/coo-llm-main/tree/main/docs/docs/',
+            'https://github.com/coo-llm/coo-llm-main/tree/main/docs/content/',
           remarkPlugins: [require('remark-mermaid')],
         },
         blog: false,
@@ -126,7 +127,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} COO-LLM. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} COO-LLM.`,
       },
       prism: {
         theme: lightCodeTheme,
