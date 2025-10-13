@@ -118,7 +118,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}:${{ steps.get_version.outputs.version }}
           ```
 
-          For more information, see the [documentation](https://coo-llm.dev).
+          For more information, see the [documentation](https://coo-llm.github.io/coo-llm-main/).
         draft: false
         prerelease: false
 
@@ -126,20 +126,19 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-     - name: Setup Node.js
-       uses: actions/setup-node@v4
-       with:
-         node-version: '18'
-         cache: 'npm'
-         cache-dependency-path: docs/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: docs/package-lock.json
 
-     - name: Install dependencies
-       run: cd docs && npm ci
+      - name: Install dependencies
+        run: cd docs && npm ci
 
       - name: Build docs
         run: cd docs && npm run build
