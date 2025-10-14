@@ -67,6 +67,10 @@ jobs:
       id: get_version
       run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+    - name: Get version
+      id: get_version
+      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -87,10 +91,6 @@ jobs:
         build-args: VERSION=${{ steps.get_version.outputs.version }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-
-    - name: Get version
-      id: get_version
-      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
     - name: Create Release
       uses: actions/create-release@v1
