@@ -12,5 +12,5 @@ RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
 WORKDIR /app
 COPY --from=builder /app/coo-llm .
 USER appuser
-# Default config path, can be overridden with -config flag
-CMD ["./coo-llm"]
+# Default config path, can be overridden with -config flag or CONFIG_PATH env var
+CMD ["sh", "-c", "./coo-llm ${CONFIG_PATH:+ -config $CONFIG_PATH}"]

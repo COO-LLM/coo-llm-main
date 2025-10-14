@@ -1,7 +1,9 @@
 # Git
 .git
 .gitignore
+*.local.yaml
 
+configs/
 # Documentation
 docs/
 *.md

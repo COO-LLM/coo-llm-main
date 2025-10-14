@@ -34,6 +34,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Override port with PORT env var if set (for Railway, etc.)
+	if port := os.Getenv("PORT"); port != "" {
+		cfg.Server.Listen = ":" + port
+	}
+
 	if err := config.ValidateConfig(cfg); err != nil {
 		fmt.Printf("Invalid config: %v\n", err)
 		os.Exit(1)
