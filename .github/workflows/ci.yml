@@ -67,7 +67,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
+        images: ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
         tags: |
           type=ref,event=tag
           type=raw,value=latest
