@@ -55,25 +55,22 @@ curl -X POST http://localhost:2906/v1/chat/completions \
 ### Docker
 
 ```bash
-# Build locally
-docker build -t coo-llm .
-
 # Run with local build
 docker run -p 2906:2906 \
   -e OPENAI_API_KEY="sk-your-key" \
   -e GEMINI_API_KEY="your-gemini-key" \
   -v $(pwd)/configs:/app/configs \
-  coo-llm
+  khapu2906/coo-llm:latest
 ```
 
 ## 📚 Documentation
 
 ### Quick Links
-- **[Introduction](docs/docs/Intro/Overview.md)**: Overview and architecture
-- **[Configuration](docs/docs/Guides/Configuration.md)**: Complete configuration reference
-- **[API Reference](docs/docs/Reference/API.md)**: REST API documentation
-- **[Load Balancing](docs/docs/Reference/Balancer.md)**: Load balancing algorithms and policies
-- **[Deployment](docs/docs/Guides/Deployment.md)**: Installation and production deployment
+- **[Introduction](docs/Intro/Overview.md)**: Overview and architecture
+- **[Configuration](docs/Guides/Configuration.md)**: Complete configuration reference
+- **[API Reference](docs/Reference/API.md)**: REST API documentation
+- **[Load Balancing](docs/Reference/Balancer.md)**: Load balancing algorithms and policies
+- **[Deployment](docs/Guides/Deployment.md)**: Installation and production deployment
 - **[LangChain Demo](langchain-demo/)**: Integration examples
 
 ### Documentation Structure
