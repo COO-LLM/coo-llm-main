@@ -14,7 +14,7 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     env:
       GEMINI_KEY_1: ${{ secrets.GEMINI_KEY_1 }}
     steps:
@@ -46,7 +46,7 @@ jobs:
       run: go build ./cmd/coo-llm
 
   release:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: test
     if: startsWith(github.ref, 'refs/tags/v')
 
@@ -118,7 +118,7 @@ jobs:
         prerelease: false
 
   docs:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: test
     if: github.ref == 'refs/heads/main'
     steps:
