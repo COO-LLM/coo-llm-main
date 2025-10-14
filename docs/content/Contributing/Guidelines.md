@@ -29,7 +29,7 @@ This project follows a code of conduct to ensure a welcoming environment for all
 
 2. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-org/coo-llm.git
+   git clone https://github.com/coo-llm/coo-llm-main.git
    cd coo-llm
    ```
 
@@ -77,7 +77,7 @@ coo-llm/
 
 ### 1. Choose an Issue
 
-- Check [GitHub Issues](https://github.com/your-org/coo-llm/issues) for open tasks
+- Check [GitHub Issues](https://github.com/coo-llm/coo-llm-main/issues) for open tasks
 - Look for issues labeled `good first issue` or `help wanted`
 - Comment on the issue to indicate you're working on it
 

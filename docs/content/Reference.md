@@ -19,5 +19,5 @@ See [Configuration Guide](./Guides/Configuration.md) for complete configuration 
 
 ## Code Reference
 
-- [Go Package Documentation](https://pkg.go.dev/github.com/your-org/coo-llm)
-- [Source Code](https://github.com/your-org/coo-llm)
+- [Go Package Documentation](https://pkg.go.dev/github.com/coo-llm/coo-llm-main)
+- [Source Code](https://github.com/coo-llm/coo-llm-main)

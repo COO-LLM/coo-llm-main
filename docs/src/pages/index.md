@@ -35,7 +35,7 @@ COO-LLM is a high-performance reverse proxy that intelligently distributes reque
 
 ```bash
 # Clone and build
-git clone https://github.com/your-org/coo-llm.git
+git clone https://github.com/coo-llm/coo-llm-main.git
 cd coo-llm
 go build -o bin/coo-llm ./cmd/coo-llm
 

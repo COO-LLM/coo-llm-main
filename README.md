@@ -35,7 +35,7 @@ COO-LLM is a high-performance reverse proxy that intelligently distributes reque
 
 ```bash
 # Clone and build
-git clone https://github.com/your-org/coo-llm.git
+git clone https://github.com/coo-llm/coo-llm-main.git
 cd coo-llm
 go build -o bin/coo-llm ./cmd/coo-llm
 
@@ -492,7 +492,7 @@ We welcome contributions! Please see our [Contributing Guidelines](docs/content/
 
 ### Development Setup
 ```bash
-git clone https://github.com/your-org/coo-llm.git
+git clone https://github.com/coo-llm/coo-llm-main.git
 cd coo-llm
 go mod download
 go build ./...
@@ -520,8 +520,8 @@ This project is licensed under the DIB License v1.0 - see the [LICENSE](LICENSE)
 
 ## 📞 Support & Community
 
-- 🐛 [GitHub Issues](https://github.com/your-org/coo-llm/issues) - Bug reports and feature requests
-- 💬 [Discussions](https://github.com/your-org/coo-llm/discussions) - Questions and general discussion
+- 🐛 [GitHub Issues](https://github.com/coo-llm/coo-llm-main/issues) - Bug reports and feature requests
+- 💬 [Discussions](https://github.com/coo-llm/coo-llm-main/discussions) - Questions and general discussion
 - 📖 [Documentation](docs/content/) - Comprehensive guides and API reference
 - 🧪 [LangChain Demo](langchain-demo/) - Integration examples
 

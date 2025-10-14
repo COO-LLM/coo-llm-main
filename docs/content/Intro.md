@@ -21,7 +21,7 @@ Get started in minutes:
 
 ```bash
 # Clone and run
-git clone https://github.com/your-org/coo-llm.git
+git clone https://github.com/coo-llm/coo-llm-main.git
 cd coo-llm
 make build && make run
 ```

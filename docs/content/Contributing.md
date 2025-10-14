@@ -13,6 +13,6 @@ We welcome contributions to COO-LLM! This section contains information for contr
 
 ## Resources
 
-- [GitHub Repository](https://github.com/your-org/coo-llm)
-- [Issue Tracker](https://github.com/your-org/coo-llm/issues)
-- [Discussions](https://github.com/your-org/coo-llm/discussions)
+- [GitHub Repository](https://github.com/coo-llm/coo-llm-main)
+- [Issue Tracker](https://github.com/coo-llm/coo-llm-main/issues)
+- [Discussions](https://github.com/coo-llm/coo-llm-main/discussions)

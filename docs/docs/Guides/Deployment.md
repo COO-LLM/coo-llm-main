@@ -46,7 +46,7 @@ flowchart TD
 
 1. **Clone and build:**
    ```bash
-   git clone https://github.com/your-org/coo-llm.git
+   git clone https://github.com/coo-llm/coo-llm-main.git
    cd coo-llm
    go build -o coo-llm ./cmd/coo-llm
    ```
