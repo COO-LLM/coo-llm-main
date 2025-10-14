@@ -6,7 +6,7 @@ COO-LLM is a high-performance reverse proxy that intelligently distributes reque
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://docker.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: DIB](https://img.shields.io/badge/License-DIB-black.svg)](https://devs-in-black.web.app/#license)
 [![OpenAI Compatible](https://img.shields.io/badge/OpenAI-Compatible-green.svg)](https://platform.openai.com/docs)
 
 ## 🚀 Features

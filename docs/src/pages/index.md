@@ -6,7 +6,7 @@ COO-LLM is a high-performance reverse proxy that intelligently distributes reque
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://docker.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: DIB](https://img.shields.io/badge/License-DIB-black.svg)](https://devs-in-black.web.app/#license)
 [![OpenAI Compatible](https://img.shields.io/badge/OpenAI-Compatible-green.svg)](https://platform.openai.com/docs)
 
 ## 🚀 Features
@@ -68,14 +68,12 @@ docker run -p 2906:2906 \
 
 ## 📚 Documentation
 
-Complete documentation is available in the [docs/content/](docs/content/) directory.
-
 ### Quick Links
-- **[Introduction](docs/content/Intro/Overview.md)**: Overview and architecture
-- **[Configuration](docs/content/Guides/Configuration.md)**: Complete configuration reference
-- **[API Reference](docs/content/Reference/API.md)**: REST API documentation
-- **[Load Balancing](docs/content/Reference/Balancer.md)**: Load balancing algorithms and policies
-- **[Deployment](docs/content/Guides/Deployment.md)**: Installation and production deployment
+- **[Introduction](docs/docs/Intro/Overview.md)**: Overview and architecture
+- **[Configuration](docs/docs/Guides/Configuration.md)**: Complete configuration reference
+- **[API Reference](docs/docs/Reference/API.md)**: REST API documentation
+- **[Load Balancing](docs/docs/Reference/Balancer.md)**: Load balancing algorithms and policies
+- **[Deployment](docs/docs/Guides/Deployment.md)**: Installation and production deployment
 - **[LangChain Demo](langchain-demo/)**: Integration examples
 
 ### Documentation Structure
