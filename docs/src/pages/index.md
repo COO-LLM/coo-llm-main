@@ -71,7 +71,7 @@ docker run -p 2906:2906 \
 - **[API Reference](docs/Reference/API.md)**: REST API documentation
 - **[Load Balancing](docs/Reference/Balancer.md)**: Load balancing algorithms and policies
 - **[Deployment](docs/Guides/Deployment.md)**: Installation and production deployment
-- **[LangChain Demo](langchain-demo/)**: Integration examples
+- **[LangChain Demo](https://github.com/COO-LLM/coo-llm-main/tree/main/example/langchain-demo)**: Integration examples
 
 ### Documentation Structure
 - **Intro**: Overview, architecture, and getting started
