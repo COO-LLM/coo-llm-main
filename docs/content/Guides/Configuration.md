@@ -210,13 +210,38 @@ Array of LLM provider configurations:
 |-------|------|-------------|
 | `id` | string | Unique provider ID (used in model aliases) |
 | `type` | string | Provider type: `openai`, `gemini`, `claude`, `custom` |
-| `api_keys` | []string | Array of API keys for this provider |
+| `api_keys` | []string | Array of API keys for load balancing and failover |
 | `base_url` | string | Provider API base URL (optional, uses default if not set) |
 | `model` | string | Default model for this provider |
 | `pricing.input_token_cost` | float64 | Cost per 1K input tokens |
 | `pricing.output_token_cost` | float64 | Cost per 1K output tokens |
 | `limits.req_per_min` | int | Request rate limit per key |
 | `limits.tokens_per_min` | int | Token rate limit per key |
+
+#### Multiple API Keys
+
+Providers support multiple API keys for load balancing and redundancy:
+
+```yaml
+llm_providers:
+  - id: "openai"
+    type: "openai"
+    api_keys: ["${OPENAI_KEY_1}", "${OPENAI_KEY_2}", "${OPENAI_KEY_3}"]
+    model: "gpt-4o"
+    limits:
+      req_per_min: 200  # Per key
+      tokens_per_min: 100000
+```
+
+**Key Selection Algorithm:**
+- **Load Balancing**: Selects key with least usage (requests + tokens)
+- **Failover**: Retries with next key on API errors (rate limits, quota)
+- **Thread-Safe**: Concurrent requests use different keys safely
+
+**Usage Tracking:**
+- Tracks requests and tokens per key
+- Balances load across keys automatically
+- Resets on application restart
 
 ### API Key Permissions
 
@@ -266,30 +291,56 @@ model_aliases:
 
 ### Policy Configuration
 
-Load balancing algorithm configuration:
+Load balancing and routing policy:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| `strategy` | string | `hybrid` | Legacy field, use `algorithm` |
 | `algorithm` | string | `round_robin` | Algorithm: `round_robin`, `least_loaded`, `hybrid` |
-| `priority` | string | `balanced` | Priority: `balanced`, `cost`, `req`, `token` (auto-sets weights) |
-| `hybrid_weights.*` | float64 | - | Manual weights for hybrid scoring |
+| `priority` | string | `balanced` | Priority preset: `balanced`, `cost`, `req`, `token` (auto-sets weights) |
+| `hybrid_weights.*` | float64 | - | Manual weights for hybrid scoring (0.0-1.0) |
+| `retry.max_attempts` | int | `3` | Maximum retry attempts on failure |
+| `retry.timeout` | duration | `30s` | Timeout per attempt |
+| `retry.interval` | duration | `1s` | Delay between retries |
+| `cache.enabled` | bool | `true` | Enable response caching |
+| `cache.ttl_seconds` | int64 | `10` | Cache TTL in seconds |
+
+#### Load Balancing Algorithms
+
+- **round_robin**: Cycle through providers/keys sequentially
+- **least_loaded**: Select provider/key with lowest current load
+- **hybrid**: Weighted scoring based on cost, latency, error rate
+
+#### API Key Load Balancing
+
+Within each provider, multiple API keys are load balanced:
+- Automatic failover on rate limits/quota errors
+- Usage-based selection (requests + tokens)
+- Thread-safe concurrent access
 
 ## Environment Variables
 
-Configuration supports environment variable substitution:
+Configuration supports environment variable substitution in YAML files:
 
 ```yaml
-providers:
-  - keys:
-      - secret: "${OPENAI_API_KEY}"
+server:
+  admin_api_key: "${ADMIN_API_KEY}"
+
+llm_providers:
+  - api_keys: ["${OPENAI_KEY_1}", "${OPENAI_KEY_2}"]
+    model: "${DEFAULT_MODEL}"
 ```
 
 Set environment variables before running:
 
 ```bash
-export OPENAI_API_KEY="sk-your-key"
-./coo-llm -config config.yaml
+export OPENAI_KEY_1="sk-key1"
+export OPENAI_KEY_2="sk-key2"
+export DEFAULT_MODEL="gpt-4o"
+./coo-llm --config config.yaml
 ```
+
+**Note**: Variables are expanded at config load time, not runtime.
 
 ## Configuration Validation
 
@@ -357,14 +408,14 @@ storage:
 llm_providers:
   - id: "openai-prod"
     type: "openai"
-    api_keys: ["${OPENAI_KEY_1}", "${OPENAI_KEY_2}"]
+    api_keys: ["${OPENAI_KEY_1}", "${OPENAI_KEY_2}", "${OPENAI_KEY_3}"]  # Multiple keys for load balancing
     base_url: "https://api.openai.com"
     model: "gpt-4o"
     pricing:
       input_token_cost: 0.002
       output_token_cost: 0.01
     limits:
-      req_per_min: 200
+      req_per_min: 200  # Per key rate limit
       tokens_per_min: 100000
   - id: "gemini-prod"
     type: "gemini"

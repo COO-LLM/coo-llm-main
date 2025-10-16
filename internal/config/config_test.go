@@ -62,3 +62,36 @@ func TestValidateConfig(t *testing.T) {
 	err = ValidateConfig(cfg)
 	assert.Error(t, err)
 }
+
+func TestLoadConfig_EnvVarExpansion(t *testing.T) {
+	// Set env vars
+	os.Setenv("TEST_API_KEY", "sk-expanded")
+	os.Setenv("TEST_ADMIN_KEY", "admin-expanded")
+	defer os.Unsetenv("TEST_API_KEY")
+	defer os.Unsetenv("TEST_ADMIN_KEY")
+
+	// Create config with placeholders
+	configContent := `
+version: "1.0"
+server:
+  listen: ":2906"
+  admin_api_key: "${TEST_ADMIN_KEY}"
+llm_providers:
+  - type: "openai"
+    api_keys: ["${TEST_API_KEY}"]
+    model: "gpt-4o"
+`
+	tmpFile, err := os.CreateTemp("", "config*.yaml")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(configContent)
+	require.NoError(t, err)
+	tmpFile.Close()
+
+	cfg, err := LoadConfig(tmpFile.Name())
+	require.NoError(t, err)
+
+	assert.Equal(t, "sk-expanded", cfg.LLMProviders[0].APIKeys[0])
+	assert.Equal(t, "admin-expanded", cfg.Server.AdminAPIKey)
+}

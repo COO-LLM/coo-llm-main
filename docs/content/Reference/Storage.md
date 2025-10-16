@@ -5,7 +5,7 @@ tags: [developer-guide, storage]
 
 # Storage
 
-COO-LLM uses pluggable storage backends for runtime metrics and caching. The system supports Redis, in-memory, HTTP API, and file-based storage.
+COO-LLM uses pluggable storage backends for runtime metrics and caching. The system supports Redis, in-memory, HTTP API, file-based, SQL databases, MongoDB, and DynamoDB storage.
 
 ## Storage Interface
 
@@ -23,6 +23,136 @@ type RuntimeStore interface {
 ```
 
 ## Supported Backends
+
+### SQL Database Storage (PostgreSQL)
+
+**Configuration:**
+```yaml
+storage:
+  runtime:
+    type: "sql"
+    addr: "postgresql://user:password@localhost/dbname?sslmode=disable"
+```
+
+**Features:**
+- Full SQL database support with PostgreSQL
+- Persistent storage with ACID transactions
+- Advanced querying capabilities
+- Time-window analytics support
+- Automatic table creation and indexing
+
+**Data Structure:**
+```sql
+-- Usage metrics table
+CREATE TABLE usage_metrics (
+    provider VARCHAR(50) NOT NULL,
+    key_id VARCHAR(100) NOT NULL,
+    metric VARCHAR(50) NOT NULL,
+    value DOUBLE PRECISION NOT NULL,
+    UNIQUE(provider, key_id, metric)
+);
+
+-- Usage history table for time-window queries
+CREATE TABLE usage_history (
+    provider VARCHAR(50) NOT NULL,
+    key_id VARCHAR(100) NOT NULL,
+    metric VARCHAR(50) NOT NULL,
+    delta DOUBLE PRECISION NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Cache table
+CREATE TABLE cache (
+    key VARCHAR(255) PRIMARY KEY,
+    value TEXT NOT NULL,
+    expiry TIMESTAMP WITH TIME ZONE
+);
+```
+
+### MongoDB Storage
+
+**Configuration:**
+```yaml
+storage:
+  runtime:
+    type: "mongodb"
+    addr: "mongodb://localhost:27017"
+    database: "coo_llm"
+```
+
+**Features:**
+- NoSQL document database support
+- Flexible schema design
+- High performance for read/write operations
+- Aggregation pipeline for analytics
+- Automatic index creation
+
+**Data Structure:**
+```javascript
+// Usage metrics collection
+{
+    "_id": ObjectId,
+    "provider": "openai",
+    "key_id": "key1",
+    "metric": "req",
+    "value": 45.0
+}
+
+// Usage history collection
+{
+    "_id": ObjectId,
+    "provider": "openai",
+    "key_id": "key1",
+    "metric": "req",
+    "delta": 1.0,
+    "timestamp": ISODate("2024-01-01T00:00:00Z")
+}
+
+// Cache collection
+{
+    "_id": "cache_key",
+    "value": "cached_response",
+    "expiry": ISODate("2024-01-01T00:00:10Z")
+}
+```
+
+### DynamoDB Storage (AWS)
+
+**Configuration:**
+```yaml
+storage:
+  runtime:
+    type: "dynamodb"
+    addr: "us-east-1"  # AWS region
+    table_usage: "coo_llm_usage"
+    table_cache: "coo_llm_cache"
+    table_history: "coo_llm_history"
+```
+
+**Features:**
+- AWS managed NoSQL database
+- Auto-scaling and high availability
+- Pay-per-request pricing
+- Global tables for multi-region
+- Time-window queries with history table
+
+**Data Structure:**
+```
+Usage Table:
+PK: USAGE#{provider}#{key_id}
+SK: {metric}
+Attributes: value (Number)
+
+History Table:
+PK: HISTORY#{provider}#{key_id}#{metric}
+SK: {timestamp}
+Attributes: delta (Number), timestamp (Number)
+
+Cache Table:
+PK: CACHE#{key}
+SK: DATA
+Attributes: value (String), expiry (Number)
+```
 
 ### Redis Storage (Production)
 
@@ -129,10 +259,14 @@ policy:
 ```yaml
 storage:
   runtime:
-    type: "redis"  # redis, memory, http, file
-    addr: "localhost:6379"
-    password: ""
-    api_key: ""
+    type: "redis"  # redis, memory, http, file, sql, mongodb, dynamodb
+    addr: "localhost:6379"  # Connection string or endpoint
+    password: ""            # Redis password
+    api_key: ""             # HTTP API key
+    database: "coo_llm"     # Database name for MongoDB
+    table_usage: "coo_llm_usage"     # DynamoDB table names
+    table_cache: "coo_llm_cache"
+    table_history: "coo_llm_history"
 ```
 
 ### Cache Configuration
@@ -142,6 +276,26 @@ policy:
   cache:
     enabled: true
     ttl_seconds: 10
+```
+
+## Logging and Monitoring
+
+All storage backends include comprehensive logging for database operations:
+
+- **Debug logs**: All Get/Set/Increment operations with parameters and results
+- **Error logs**: Failed operations with error details
+- **Performance monitoring**: Operation timing and success rates
+
+**Log Levels:**
+- `DEBUG`: Successful operations with context
+- `ERROR`: Failed operations with error messages
+- `INFO`: Connection status and initialization
+
+**Example logs:**
+```
+DEBUG store operation operation=GetUsage provider=openai keyID=key1 metric=req value=45
+DEBUG store operation operation=IncrementUsage provider=openai keyID=key1 metric=tokens delta=150
+ERROR store operation failed operation=SetUsage provider=openai keyID=key1 metric=req error="connection timeout"
 ```
 
 ## Implementation Details
@@ -184,6 +338,36 @@ policy:
 - Simple persistence
 - Not concurrent-safe
 
+### SQL Backend
+
+**File:** `internal/store/sql.go`
+
+**Features:**
+- PostgreSQL driver with `lib/pq`
+- Automatic schema migration
+- Transaction support for consistency
+- Indexed queries for performance
+
+### MongoDB Backend
+
+**File:** `internal/store/mongodb.go`
+
+**Features:**
+- Official MongoDB Go driver
+- Connection pooling and monitoring
+- Aggregation framework for analytics
+- Automatic index management
+
+### DynamoDB Backend
+
+**File:** `internal/store/dynamodb.go`
+
+**Features:**
+- AWS SDK v2 for DynamoDB
+- Multi-table architecture for efficiency
+- Conditional updates and atomic operations
+- Time-window queries via history table
+
 ## Metrics Usage
 
 Metrics are used for:
@@ -197,10 +381,29 @@ Metrics are used for:
 
 ### Production Setup
 
+**Redis:**
 - Use Redis for production deployments
 - Set appropriate TTL values (default 60s)
 - Monitor Redis memory usage
 - Implement Redis persistence (RDB/AOF)
+
+**SQL Databases:**
+- Use PostgreSQL for relational workloads
+- Enable connection pooling
+- Monitor query performance and indexes
+- Regular VACUUM for maintenance
+
+**MongoDB:**
+- Use MongoDB for high-throughput scenarios
+- Configure replica sets for HA
+- Monitor oplog and disk usage
+- Use appropriate read preferences
+
+**DynamoDB:**
+- Use DynamoDB for AWS-native deployments
+- Monitor read/write capacity and costs
+- Design partition keys for even distribution
+- Use DynamoDB Streams for cross-region replication
 
 ### Development Setup
 
@@ -212,27 +415,42 @@ Metrics are used for:
 
 ### Common Issues
 
-**Redis connection failed:**
+**Database Connection Failed:**
 ```bash
-# Test connection
+# Redis
 redis-cli -h localhost -p 6379 ping
 
-# Check Redis logs
-docker logs redis-container
+# PostgreSQL
+psql -h localhost -U user -d dbname -c "SELECT 1"
+
+# MongoDB
+mongosh --eval "db.runCommand({ping: 1})"
+
+# DynamoDB (via AWS CLI)
+aws dynamodb list-tables --region us-east-1
 ```
 
 **Metrics not updating:**
 - Verify storage backend configuration
 - Check for storage errors in logs
-- Ensure proper permissions
+- Ensure proper permissions and credentials
+- Validate connection strings
 
-**High memory usage:**
-- Monitor Redis memory with `INFO memory`
+**High memory/disk usage:**
+- Monitor database metrics
 - Adjust TTL values if needed
-- Implement key expiration
+- Implement data cleanup policies
+- Check for memory leaks in application
+
+**Slow queries:**
+- Add appropriate indexes
+- Monitor query execution plans
+- Consider data partitioning
+- Use connection pooling
 
 ### Debug Commands
 
+**Redis:**
 ```bash
 # View all usage keys
 redis-cli keys "usage:*"
@@ -242,4 +460,49 @@ redis-cli get "usage:openai:key1:req"
 
 # Check TTL
 redis-cli ttl "usage:openai:key1:req"
+```
+
+**PostgreSQL:**
+```sql
+-- View usage metrics
+SELECT * FROM usage_metrics WHERE provider = 'openai';
+
+-- Check recent history
+SELECT * FROM usage_history
+WHERE timestamp > NOW() - INTERVAL '1 hour'
+ORDER BY timestamp DESC;
+
+-- Monitor table sizes
+SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size
+FROM pg_tables WHERE tablename LIKE 'usage%';
+```
+
+**MongoDB:**
+```javascript
+// View usage metrics
+db.usage_metrics.find({provider: "openai"})
+
+// Check recent history
+db.usage_history.find({
+  timestamp: {$gt: new Date(Date.now() - 3600000)}
+}).sort({timestamp: -1})
+
+// Monitor collection stats
+db.usage_metrics.stats()
+```
+
+**DynamoDB:**
+```bash
+# List tables
+aws dynamodb list-tables --region us-east-1
+
+# Scan usage table
+aws dynamodb scan --table-name coo_llm_usage --region us-east-1
+
+# Query history
+aws dynamodb query \
+  --table-name coo_llm_history \
+  --key-condition-expression "pk = :pk" \
+  --expression-attribute-values '{":pk":{"S":"HISTORY#openai#key1#req"}}' \
+  --region us-east-1
 ```

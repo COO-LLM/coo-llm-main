@@ -19,7 +19,7 @@ import (
 var version = "dev"
 
 func main() {
-	configPath := flag.String("config", "configs/config.yaml", "path to config file")
+	configPath := flag.String("config", "dummy", "path to config file (optional, uses env vars if not set)")
 	versionFlag := flag.Bool("version", false, "show version")
 	flag.Parse()
 
@@ -28,7 +28,16 @@ func main() {
 		os.Exit(0)
 	}
 
-	cfg, err := config.LoadConfig(*configPath)
+	// Use CONFIG_PATH env var if set, else flag value
+	cfgPath := ""
+	if *configPath != "dummy" {
+		cfgPath = *configPath
+	}
+	if envPath := os.Getenv("CONFIG_PATH"); envPath != "" {
+		cfgPath = envPath
+	}
+
+	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
@@ -44,6 +53,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Init logger
+	logger := log.NewLogger(&cfg.Logging)
+
 	// Init registry
 	reg := provider.NewRegistry()
 	if err := reg.LoadFromConfig(cfg); err != nil {
@@ -55,20 +67,38 @@ func main() {
 	var runtimeStore store.RuntimeStore
 	switch cfg.Storage.Runtime.Type {
 	case "redis":
-		runtimeStore = store.NewRedisStore(cfg.Storage.Runtime.Addr, cfg.Storage.Runtime.Password)
+		runtimeStore = store.NewRedisStore(cfg.Storage.Runtime.Addr, cfg.Storage.Runtime.Password, logger.GetLogger())
 	case "http":
-		runtimeStore = store.NewHTTPStore(cfg.Storage.Runtime.Addr, cfg.Storage.Runtime.APIKey)
+		runtimeStore = store.NewHTTPStore(cfg.Storage.Runtime.Addr, cfg.Storage.Runtime.APIKey, logger.GetLogger())
+	case "sql":
+		sqlStore, err := store.NewSQLStore(cfg.Storage.Runtime.Addr, logger.GetLogger())
+		if err != nil {
+			fmt.Printf("Failed to connect to SQL database: %v\n", err)
+			os.Exit(1)
+		}
+		runtimeStore = sqlStore
+	case "mongodb":
+		mongoStore, err := store.NewMongoDBStore(cfg.Storage.Runtime.Addr, cfg.Storage.Runtime.Database, logger.GetLogger())
+		if err != nil {
+			fmt.Printf("Failed to connect to MongoDB: %v\n", err)
+			os.Exit(1)
+		}
+		runtimeStore = mongoStore
+	case "dynamodb":
+		dynamoStore, err := store.NewDynamoDBStore(cfg.Storage.Runtime.Addr, cfg.Storage.Runtime.TableUsage, cfg.Storage.Runtime.TableCache, cfg.Storage.Runtime.TableHistory, logger.GetLogger())
+		if err != nil {
+			fmt.Printf("Failed to connect to DynamoDB: %v\n", err)
+			os.Exit(1)
+		}
+		runtimeStore = dynamoStore
 	case "memory":
-		runtimeStore = store.NewMemoryStore()
+		runtimeStore = store.NewMemoryStore(logger.GetLogger())
 	default:
-		runtimeStore = store.NewMemoryStore() // Default to memory
+		runtimeStore = store.NewMemoryStore(logger.GetLogger()) // Default to memory
 	}
 
 	// Init selector
 	selector := balancer.NewSelector(cfg, runtimeStore)
-
-	// Init logger
-	logger := log.NewLogger(&cfg.Logging)
 
 	// Setup router
 	r := chi.NewRouter()

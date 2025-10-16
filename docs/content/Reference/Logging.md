@@ -106,6 +106,46 @@ General application events and errors:
 }
 ```
 
+### Storage Operation Logs
+
+All storage backends log database operations for monitoring and debugging:
+
+```json
+{
+  "level": "debug",
+  "operation": "GetUsage",
+  "provider": "openai",
+  "keyID": "key1",
+  "metric": "req",
+  "value": 45,
+  "message": "store operation",
+  "time": "2024-01-01T12:00:00Z"
+}
+```
+
+```json
+{
+  "level": "debug",
+  "operation": "IncrementUsage",
+  "provider": "openai",
+  "keyID": "key1",
+  "metric": "tokens",
+  "delta": 150,
+  "old_value": 1200,
+  "new_value": 1350,
+  "message": "store operation",
+  "time": "2024-01-01T12:00:00Z"
+}
+```
+
+**Storage Log Fields:**
+- `operation`: Operation type (GetUsage, SetUsage, IncrementUsage, etc.)
+- `provider`: Provider identifier
+- `keyID`: API key identifier
+- `metric`: Metric name (req, tokens, etc.)
+- `value`/`delta`: Numeric values involved
+- `error`: Error message for failed operations
+
 ### Prometheus Metrics
 
 When enabled, metrics are exposed at `/metrics` endpoint.

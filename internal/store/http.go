@@ -9,16 +9,18 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/user/coo-llm/internal/config"
 )
 
 type HTTPStore struct {
 	endpoint string
 	apiKey   string
+	logger   zerolog.Logger
 }
 
-func NewHTTPStore(endpoint, apiKey string) *HTTPStore {
-	return &HTTPStore{endpoint: endpoint, apiKey: apiKey}
+func NewHTTPStore(endpoint, apiKey string, logger zerolog.Logger) *HTTPStore {
+	return &HTTPStore{endpoint: endpoint, apiKey: apiKey, logger: logger}
 }
 
 func (h *HTTPStore) GetUsage(provider, keyID, metric string) (float64, error) {

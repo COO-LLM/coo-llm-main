@@ -76,6 +76,53 @@ func TestOpenAIProvider_ListModels(t *testing.T) {
 	assert.Contains(t, models, "gpt-4o")
 }
 
+func TestLLMConfig_APIKey(t *testing.T) {
+	cfg := LLMConfig{APIKeys: []string{"key1", "key2"}}
+	assert.Equal(t, "key1", cfg.APIKey())
+}
+
+func TestLLMConfig_NextAPIKey(t *testing.T) {
+	cfg := LLMConfig{APIKeys: []string{"key1", "key2", "key3"}}
+	assert.Equal(t, "key1", cfg.NextAPIKey())
+	assert.Equal(t, "key2", cfg.NextAPIKey())
+	assert.Equal(t, "key3", cfg.NextAPIKey())
+	assert.Equal(t, "key1", cfg.NextAPIKey()) // Rotate back
+}
+
+func TestLLMConfig_SelectLeastLoadedKey(t *testing.T) {
+	cfg := LLMConfig{APIKeys: []string{"key1", "key2", "key3"}}
+	cfg.InitUsages()
+
+	// Initially all have 0 usage, should return first
+	assert.Equal(t, "key1", cfg.SelectLeastLoadedKey())
+
+	// Update usage for key1
+	cfg.UpdateUsage(10, 1000)
+
+	// Now key2 should be selected
+	assert.Equal(t, "key2", cfg.SelectLeastLoadedKey())
+
+	// Update key2 with more usage
+	cfg.UpdateUsage(20, 2000)
+
+	// key3 should be selected
+	assert.Equal(t, "key3", cfg.SelectLeastLoadedKey())
+}
+
+func TestLLMConfig_UpdateUsage(t *testing.T) {
+	cfg := LLMConfig{APIKeys: []string{"key1", "key2"}}
+	cfg.InitUsages()
+
+	cfg.UpdateUsage(5, 500)
+	assert.Equal(t, int64(5), cfg.usages[0].ReqCount)
+	assert.Equal(t, int64(500), cfg.usages[0].TokenCount)
+
+	cfg.NextAPIKey() // Switch to key2
+	cfg.UpdateUsage(3, 300)
+	assert.Equal(t, int64(3), cfg.usages[0].ReqCount) // Now key2 is first
+	assert.Equal(t, int64(300), cfg.usages[0].TokenCount)
+}
+
 // Mock provider for testing
 type mockProvider struct {
 	name string

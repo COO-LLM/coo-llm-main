@@ -8,7 +8,7 @@ COO-LLM is a high-performance reverse proxy that intelligently distributes reque
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://docker.com)
 [![License: DIB](https://img.shields.io/badge/License-DIB-black.svg)](https://devs-in-black.web.app/#license)
 [![OpenAI Compatible](https://img.shields.io/badge/OpenAI-Compatible-green.svg)](https://platform.openai.com/docs)
-
+<a href="https://www.producthunt.com/products/themesforaustralia?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-coo&#0045;llm" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1026670&theme=light&t=1760638369012" alt="COO&#0045;LLM - COO&#0032;for&#0032;Our&#0032;Large&#0032;Language&#0032;Model&#0032;Providers | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 ## 🚀 Features
 
 ### ✨ Core Capabilities

@@ -91,10 +91,14 @@ type ConfigStore struct {
 }
 
 type RuntimeStore struct {
-	Type     string `yaml:"type" mapstructure:"type"`
-	Addr     string `yaml:"addr" mapstructure:"addr"`
-	Password string `yaml:"password" mapstructure:"password"`
-	APIKey   string `yaml:"api_key" mapstructure:"api_key"`
+	Type         string `yaml:"type" mapstructure:"type"`
+	Addr         string `yaml:"addr" mapstructure:"addr"`
+	Password     string `yaml:"password" mapstructure:"password"`
+	APIKey       string `yaml:"api_key" mapstructure:"api_key"`
+	Database     string `yaml:"database" mapstructure:"database"`
+	TableUsage   string `yaml:"table_usage" mapstructure:"table_usage"`
+	TableCache   string `yaml:"table_cache" mapstructure:"table_cache"`
+	TableHistory string `yaml:"table_history" mapstructure:"table_history"`
 }
 
 type Provider struct {
@@ -145,21 +149,141 @@ type HybridWeights struct {
 	CostRatio  float64 `yaml:"cost_ratio" mapstructure:"cost_ratio"`
 }
 
+// expandEnvVars expands ${VAR} placeholders in string values
+func expandEnvVars(data map[string]interface{}) {
+	for key, value := range data {
+		switch v := value.(type) {
+		case string:
+			data[key] = os.ExpandEnv(v)
+		case map[string]interface{}:
+			expandEnvVars(v)
+		case []interface{}:
+			for i, item := range v {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					expandEnvVars(itemMap)
+				} else if itemStr, ok := item.(string); ok {
+					v[i] = os.ExpandEnv(itemStr)
+				}
+			}
+		}
+	}
+}
+
 func LoadConfig(path string) (*Config, error) {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, fmt.Errorf("config file does not exist: %s", path)
-	}
-
-	viper.SetConfigFile(path)
-	viper.SetConfigType("yaml")
-
-	if err := viper.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("failed to read config: %w", err)
-	}
-
 	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+
+	if path != "" {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return nil, fmt.Errorf("config file does not exist: %s", path)
+		}
+
+		viper.SetConfigFile(path)
+		viper.SetConfigType("yaml")
+
+		if err := viper.ReadInConfig(); err != nil {
+			return nil, fmt.Errorf("failed to read config: %w", err)
+		}
+
+		// Get raw config data
+		var rawData map[string]interface{}
+		if err := viper.Unmarshal(&rawData); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal raw config: %w", err)
+		}
+
+		// Expand environment variables
+		expandEnvVars(rawData)
+
+		// Marshal back to YAML and unmarshal to struct
+		yamlData, err := yaml.Marshal(rawData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal expanded config: %w", err)
+		}
+
+		if err := yaml.Unmarshal(yamlData, &cfg); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal expanded config: %w", err)
+		}
+	} else {
+		// Load from environment variables only
+		viper.AutomaticEnv()
+
+		// Set defaults
+		cfg.Version = "1.0"
+		cfg.Server.Listen = ":2906"
+		cfg.Server.AdminAPIKey = os.Getenv("COO__ADMIN_API_KEY")
+		cfg.Logging.File.Enabled = true
+		cfg.Logging.File.Path = "./logs/llm.log"
+		cfg.Logging.File.MaxSizeMB = 100
+		cfg.Logging.File.MaxBackups = 5
+		cfg.Logging.Prometheus.Enabled = true
+		cfg.Logging.Prometheus.Endpoint = "/metrics"
+		cfg.Storage.Config.Type = "file"
+		cfg.Storage.Config.Path = "./data/config.json"
+		cfg.Storage.Runtime.Type = "memory"
+		cfg.Storage.Runtime.Database = "coo_llm"
+		cfg.Storage.Runtime.TableUsage = "coo_llm_usage"
+		cfg.Storage.Runtime.TableCache = "coo_llm_cache"
+		cfg.Storage.Runtime.TableHistory = "coo_llm_history"
+		cfg.Policy.Strategy = "hybrid"
+		cfg.Policy.Algorithm = "hybrid"
+		cfg.Policy.Priority = "balanced"
+		cfg.Policy.Retry.MaxAttempts = 3
+		cfg.Policy.Retry.Timeout = 30 * time.Second
+		cfg.Policy.Retry.Interval = 1 * time.Second
+		cfg.Policy.Cache.Enabled = true
+		cfg.Policy.Cache.TTLSeconds = 10
+
+		if err := viper.Unmarshal(&cfg); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal from env: %w", err)
+		}
+
+		// Build providers from env vars with COO__ prefix
+		if openaiKey := os.Getenv("COO__OPENAI_API_KEY"); openaiKey != "" {
+			cfg.LLMProviders = append(cfg.LLMProviders, LLMProvider{
+				ID:      "openai",
+				Type:    "openai",
+				APIKeys: []string{openaiKey},
+				Model:   os.Getenv("COO_LLM_OPENAI_MODEL"),
+			})
+			if cfg.LLMProviders[len(cfg.LLMProviders)-1].Model == "" {
+				cfg.LLMProviders[len(cfg.LLMProviders)-1].Model = "gpt-4o"
+			}
+		}
+		if geminiKey := os.Getenv("COO__GEMINI_API_KEY"); geminiKey != "" {
+			cfg.LLMProviders = append(cfg.LLMProviders, LLMProvider{
+				ID:      "gemini",
+				Type:    "gemini",
+				APIKeys: []string{geminiKey},
+				Model:   os.Getenv("COO__GEMINI_MODEL"),
+			})
+			if cfg.LLMProviders[len(cfg.LLMProviders)-1].Model == "" {
+				cfg.LLMProviders[len(cfg.LLMProviders)-1].Model = "gemini-1.5-pro"
+			}
+		}
+		if claudeKey := os.Getenv("COO__CLAUDE_API_KEY"); claudeKey != "" {
+			cfg.LLMProviders = append(cfg.LLMProviders, LLMProvider{
+				ID:      "claude",
+				Type:    "claude",
+				APIKeys: []string{claudeKey},
+				BaseURL: os.Getenv("COO__CLAUDE_BASE_URL"),
+				Model:   os.Getenv("COO__CLAUDE_MODEL"),
+			})
+			if cfg.LLMProviders[len(cfg.LLMProviders)-1].Model == "" {
+				cfg.LLMProviders[len(cfg.LLMProviders)-1].Model = "claude-3-opus-20240229"
+			}
+			if cfg.LLMProviders[len(cfg.LLMProviders)-1].BaseURL == "" {
+				cfg.LLMProviders[len(cfg.LLMProviders)-1].BaseURL = "https://api.anthropic.com"
+			}
+		}
+
+		// For testing, add dummy if no providers
+		if len(cfg.LLMProviders) == 0 {
+			cfg.LLMProviders = append(cfg.LLMProviders, LLMProvider{
+				ID:      "dummy",
+				Type:    "openai",
+				APIKeys: []string{"dummy"},
+				Model:   "gpt-4o",
+			})
+		}
 	}
 
 	// Set weights based on priority

@@ -63,3 +63,7 @@ func (l *Logger) sendHTTP(p config.LogProvider, entry *LogEntry) {
 	// Implement HTTP POST to p.Endpoint
 	l.logger.Info().Str("endpoint", p.Endpoint).Interface("entry", entry).Msg("sending log via HTTP")
 }
+
+func (l *Logger) GetLogger() zerolog.Logger {
+	return l.logger
+}

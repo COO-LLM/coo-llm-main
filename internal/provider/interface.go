@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/user/coo-llm/internal/config"
 )
@@ -23,6 +25,13 @@ const (
 	ProviderClaude ProviderType = "claude"
 )
 
+// KeyUsage tracks usage for each API key
+type KeyUsage struct {
+	ReqCount   int64
+	TokenCount int64
+	LastUsed   time.Time
+}
+
 // LLMConfig holds configuration for LLM providers
 type LLMConfig struct {
 	Type    ProviderType   `yaml:"type" mapstructure:"type"`
@@ -31,6 +40,8 @@ type LLMConfig struct {
 	Model   string         `yaml:"model" mapstructure:"model"`
 	Pricing config.Pricing `yaml:"pricing" mapstructure:"pricing"`
 	Limits  config.Limits  `yaml:"limits" mapstructure:"limits"`
+	mu      sync.Mutex     // For thread-safe key rotation
+	usages  []KeyUsage     // Usage tracking for each key
 }
 
 type Pricing struct {
@@ -52,18 +63,77 @@ func (c LLMConfig) APIKey() string {
 	return ""
 }
 
-// NextAPIKey returns the next API key in round-robin fashion
+// InitUsages initializes usage tracking for keys
+func (c *LLMConfig) InitUsages() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.usages) == 0 {
+		c.usages = make([]KeyUsage, len(c.APIKeys))
+		for i := range c.usages {
+			c.usages[i] = KeyUsage{LastUsed: time.Now()}
+		}
+	}
+}
+
+// NextAPIKey returns the next API key in round-robin fashion (thread-safe)
 func (c *LLMConfig) NextAPIKey() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if len(c.APIKeys) == 0 {
 		return ""
 	}
-	// Simple round-robin, can be improved with mutex for concurrency
 	if c.APIKeys[0] == "" {
 		return ""
 	}
+	if len(c.usages) != len(c.APIKeys) {
+		c.InitUsages()
+	}
 	key := c.APIKeys[0]
 	c.APIKeys = append(c.APIKeys[1:], key)
+	c.usages = append(c.usages[1:], c.usages[0])
 	return key
+}
+
+// SelectLeastLoadedKey returns the key with least usage (req + token ratio)
+func (c *LLMConfig) SelectLeastLoadedKey() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.APIKeys) == 0 {
+		return ""
+	}
+	if len(c.usages) != len(c.APIKeys) {
+		c.InitUsages()
+	}
+
+	minIndex := 0
+	minScore := float64(c.usages[0].ReqCount) + float64(c.usages[0].TokenCount)*0.01 // Weight tokens less
+
+	for i := 1; i < len(c.usages); i++ {
+		score := float64(c.usages[i].ReqCount) + float64(c.usages[i].TokenCount)*0.01
+		if score < minScore {
+			minScore = score
+			minIndex = i
+		}
+	}
+
+	// Rotate to put selected key first
+	if minIndex > 0 {
+		c.APIKeys = append(c.APIKeys[minIndex:], c.APIKeys[:minIndex]...)
+		c.usages = append(c.usages[minIndex:], c.usages[:minIndex]...)
+	}
+
+	return c.APIKeys[0]
+}
+
+// UpdateUsage updates usage for the current key
+func (c *LLMConfig) UpdateUsage(reqCount, tokenCount int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.usages) > 0 {
+		c.usages[0].ReqCount += int64(reqCount)
+		c.usages[0].TokenCount += int64(tokenCount)
+		c.usages[0].LastUsed = time.Now()
+	}
 }
 
 // LLMRequest represents a request to generate text

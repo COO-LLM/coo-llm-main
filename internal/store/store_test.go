@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,7 +47,8 @@ llm_providers:
 }
 
 func TestMemoryStore(t *testing.T) {
-	store := NewMemoryStore()
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	store := NewMemoryStore(logger)
 
 	// Test IncrementUsage
 	err := store.IncrementUsage("openai", "key1", "req", 5.0)
@@ -88,9 +90,10 @@ func TestMemoryStore(t *testing.T) {
 }
 
 func TestRedisStore(t *testing.T) {
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 	// For Redis, we can test with a mock or skip if no Redis
 	// Since it's hard to mock, test the key generation logic
-	store := NewRedisStore("localhost:6379", "")
+	store := NewRedisStore("localhost:6379", "", logger)
 
 	// Test key format (without actual Redis)
 	// This is more of a unit test for the logic
@@ -124,7 +127,8 @@ func TestHTTPStore(t *testing.T) {
 	}))
 	defer server.Close()
 
-	store := NewHTTPStore(server.URL, "test-key")
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	store := NewHTTPStore(server.URL, "test-key", logger)
 
 	// Test GetUsage
 	val, err := store.GetUsage("openai", "key1", "req")

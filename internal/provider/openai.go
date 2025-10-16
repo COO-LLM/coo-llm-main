@@ -76,22 +76,50 @@ func (p *OpenAIProvider) Generate(ctx context.Context, req *LLMRequest) (*LLMRes
 		chatReq.TopP = float32(topP)
 	}
 
-	resp, err := p.client.CreateChatCompletion(ctx, chatReq)
-	if err != nil {
-		return nil, fmt.Errorf("OpenAI API error: %w", err)
+	// Retry with different keys if fail (max 3 attempts)
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Select least loaded key for first attempt, then rotate on retry
+		var currentKey string
+		if attempt == 0 {
+			currentKey = p.cfg.SelectLeastLoadedKey()
+		} else {
+			currentKey = p.cfg.NextAPIKey()
+		}
+		if currentKey == "" {
+			return nil, fmt.Errorf("no API key available")
+		}
+
+		config := openai.DefaultConfig(currentKey)
+		if p.cfg.BaseURL != "" {
+			config.BaseURL = p.cfg.BaseURL
+		}
+		p.client = openai.NewClientWithConfig(config)
+
+		resp, err := p.client.CreateChatCompletion(ctx, chatReq)
+		if err == nil && len(resp.Choices) > 0 {
+			// Update usage
+			p.cfg.UpdateUsage(1, resp.Usage.TotalTokens)
+			return &LLMResponse{
+				Text:         resp.Choices[0].Message.Content,
+				InputTokens:  resp.Usage.PromptTokens,
+				OutputTokens: resp.Usage.CompletionTokens,
+				TokensUsed:   resp.Usage.TotalTokens,
+				FinishReason: string(resp.Choices[0].FinishReason),
+			}, nil
+		}
+
+		// If error and not last attempt, continue to next key
+		if attempt == maxRetries-1 {
+			// Last attempt failed
+			if err != nil {
+				return nil, fmt.Errorf("OpenAI API error after %d attempts: %w", maxRetries, err)
+			}
+			return nil, fmt.Errorf("no response from OpenAI after %d attempts", maxRetries)
+		}
 	}
 
-	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("no response from OpenAI")
-	}
-
-	return &LLMResponse{
-		Text:         resp.Choices[0].Message.Content,
-		InputTokens:  resp.Usage.PromptTokens,
-		OutputTokens: resp.Usage.CompletionTokens,
-		TokensUsed:   resp.Usage.TotalTokens,
-		FinishReason: string(resp.Choices[0].FinishReason),
-	}, nil
+	return nil, fmt.Errorf("unexpected error in retry loop")
 }
 
 func (p *OpenAIProvider) ListModels(ctx context.Context) ([]string, error) {
