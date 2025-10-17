@@ -111,3 +111,34 @@ func (r *RedisStore) GetCache(key string) (string, error) {
 	}
 	return val, err
 }
+
+func (r *RedisStore) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	ctx := context.Background()
+	key := fmt.Sprintf("metrics:%s", name)
+	// Store as sorted set with timestamp as score, value as member
+	member := fmt.Sprintf("%f", value)
+	return r.client.ZAdd(ctx, key, &redis.Z{Score: float64(timestamp), Member: member}).Err()
+}
+
+func (r *RedisStore) GetMetrics(name string, tags map[string]string, start, end int64) ([]MetricPoint, error) {
+	ctx := context.Background()
+	key := fmt.Sprintf("metrics:%s", name)
+	results, err := r.client.ZRangeByScoreWithScores(ctx, key, &redis.ZRangeBy{
+		Min: fmt.Sprintf("%d", start),
+		Max: fmt.Sprintf("%d", end),
+	}).Result()
+	if err != nil {
+		return nil, err
+	}
+	var points []MetricPoint
+	for _, z := range results {
+		var value float64
+		fmt.Sscanf(z.Member.(string), "%f", &value)
+		points = append(points, MetricPoint{
+			Value:     value,
+			Timestamp: int64(z.Score),
+			Tags:      make(map[string]string),
+		})
+	}
+	return points, nil
+}

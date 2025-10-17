@@ -33,13 +33,18 @@ flowchart TD
     K[Claude Provider<br/>claude.go]:::provider
     K --> L[Claude API<br/>messages]:::external
 
+    M[Grok Provider<br/>grok.go]:::provider
+    M --> N[Grok API<br/>chat/completions]:::external
+
     B --> G
     B --> I
     B --> K
+    B --> M
 
     E --> G
     E --> I
     E --> K
+    E --> M
 ```
 
 ## Supported Providers
@@ -146,6 +151,37 @@ llm_providers:
 
 **Rate Limits:** Varies by model (see [Anthropic docs](https://docs.anthropic.com/claude/docs/rate-limits))
 
+### xAI Grok
+
+**Provider Type:** `grok`
+
+**Configuration:**
+```yaml
+llm_providers:
+  - id: "grok-prod"
+    type: "grok"
+    api_keys: ["${GROK_KEY_1}"]
+    base_url: "https://api.x.ai/v1"
+    model: "grok-beta"
+    pricing:
+      input_token_cost: 0.005
+      output_token_cost: 0.015
+    limits:
+      req_per_min: 30
+      tokens_per_min: 15000
+```
+
+**Supported Models:**
+- `grok-beta`
+
+**Features:**
+- Chat completions with conversation history
+- Token usage tracking
+- Error handling and retries
+- Rate limit management
+
+**Rate Limits:** Based on xAI tier (see [xAI docs](https://docs.x.ai/))
+
 ## Using Custom Endpoints
 
 For models that follow OpenAI, Gemini, or Claude API standards, you can use the respective provider type and specify a custom `base_url`:
@@ -169,6 +205,7 @@ llm_providers:
 - `openai`: For OpenAI-compatible APIs
 - `gemini`: For Gemini-compatible APIs
 - `claude`: For Claude-compatible APIs
+- `grok`: For Grok-compatible APIs
 
 If your model doesn't follow these standards, consider using the official SDKs directly or contributing a new provider implementation.
 
@@ -380,8 +417,7 @@ llm_providers:
       req_per_min: 100
       tokens_per_min: 50000
 
-model_aliases:
-  my-model: my-custom:my-model
+# Use "my-custom:my-model" directly (no aliases needed)
 ```
 
 ## Provider-Specific Features
@@ -402,6 +438,12 @@ model_aliases:
 - Large context windows (200K tokens)
 - Advanced reasoning
 - Constitutional AI safety
+
+### Grok Features
+- Powered by xAI's Grok model
+- Real-time knowledge updates
+- Humorous and helpful responses
+- OpenAI API compatibility
 
 ## Pricing Integration
 

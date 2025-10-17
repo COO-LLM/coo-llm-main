@@ -17,6 +17,7 @@ import (
 	"github.com/user/coo-llm/internal/config"
 	"github.com/user/coo-llm/internal/log"
 	"github.com/user/coo-llm/internal/provider"
+	"github.com/user/coo-llm/internal/store"
 )
 
 // mockStore implements store.RuntimeStore for testing
@@ -65,6 +66,12 @@ func (m *mockStore) SetCache(key, value string, ttlSeconds int64) error {
 func (m *mockStore) GetCache(key string) (string, error) {
 	return "", nil
 }
+func (m *mockStore) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	return nil
+}
+func (m *mockStore) GetMetrics(name string, tags map[string]string, start, end int64) ([]store.MetricPoint, error) {
+	return []store.MetricPoint{}, nil
+}
 
 // Mock provider that simulates external API
 type e2eMockProvider struct{}
@@ -77,6 +84,14 @@ func (m *e2eMockProvider) Generate(ctx context.Context, req *provider.LLMRequest
 		TokensUsed:   21,
 		FinishReason: "stop",
 	}, nil
+}
+func (m *e2eMockProvider) GenerateStream(ctx context.Context, req *provider.LLMRequest) (<-chan *provider.LLMStreamResponse, error) {
+	streamChan := make(chan *provider.LLMStreamResponse, 1)
+	go func() {
+		defer close(streamChan)
+		streamChan <- &provider.LLMStreamResponse{Text: "Hello! How can I help you today?", Done: true}
+	}()
+	return streamChan, nil
 }
 func (m *e2eMockProvider) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"gemini-1.5-pro"}, nil
@@ -123,7 +138,7 @@ func TestE2E_ChatCompletionsFlow(t *testing.T) {
 
 	// Setup router
 	r := chi.NewRouter()
-	api.SetupRoutes(r, selector, logger, reg, cfg)
+	api.SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	// Create test server
 	ts := httptest.NewServer(r)

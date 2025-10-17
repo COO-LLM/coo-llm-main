@@ -38,9 +38,19 @@ func (s *Selector) SelectBest(model string) (*config.Provider, *config.Key, stri
 			llmProvider := &config.Provider{
 				ID:      s.cfg.LLMProviders[i].ID,
 				BaseURL: s.cfg.LLMProviders[i].BaseURL,
-				Keys:    []config.Key{{ID: "default", Secret: secret}},
+				Keys: []config.Key{{
+					ID:                "default",
+					Secret:            secret,
+					Pricing:           s.cfg.LLMProviders[i].Pricing,
+					LimitReqPerMin:    s.cfg.LLMProviders[i].Limits.ReqPerMin,
+					LimitTokensPerMin: s.cfg.LLMProviders[i].Limits.TokensPerMin,
+				}},
 			}
-			return llmProvider, &llmProvider.Keys[0], modelName, nil
+			key, err := s.selectKey(llmProvider, modelName)
+			if err != nil {
+				return nil, nil, "", err
+			}
+			return llmProvider, key, modelName, nil
 		}
 	}
 
@@ -48,7 +58,11 @@ func (s *Selector) SelectBest(model string) (*config.Provider, *config.Key, stri
 	for i := range s.cfg.Providers {
 		if s.cfg.Providers[i].ID == providerID {
 			pCfg := &s.cfg.Providers[i]
-			return pCfg, &pCfg.Keys[0], modelName, nil
+			key, err := s.selectKey(pCfg, modelName)
+			if err != nil {
+				return nil, nil, "", err
+			}
+			return pCfg, key, modelName, nil
 		}
 	}
 
@@ -56,6 +70,12 @@ func (s *Selector) SelectBest(model string) (*config.Provider, *config.Key, stri
 }
 
 func (s *Selector) resolveModel(model string) (string, string) {
+	// Check if model is in provider:model format
+	if colonIndex := strings.Index(model, ":"); colonIndex != -1 {
+		return model[:colonIndex], model[colonIndex+1:]
+	}
+
+	// Check model aliases
 	if alias, ok := s.cfg.ModelAliases[model]; ok {
 		// Parse alias like "openai:gpt-4o"
 		parts := strings.Split(alias, ":")
@@ -63,6 +83,7 @@ func (s *Selector) resolveModel(model string) (string, string) {
 			return parts[0], parts[1]
 		}
 	}
+
 	// Default to openai if no alias
 	return "openai", model
 }
@@ -81,15 +102,15 @@ func (s *Selector) selectKey(pCfg *config.Provider, model string) (*config.Key, 
 }
 
 func (s *Selector) isRateLimited(pCfg *config.Provider, key *config.Key) bool {
-	// Check requests per minute
+	// Check requests per minute with burst allowance (10% over)
 	reqUsage, _ := s.store.GetUsageInWindow(pCfg.ID, key.ID, "req", 60) // 60 seconds window
-	if reqUsage >= float64(key.LimitReqPerMin) {
+	if reqUsage >= float64(key.LimitReqPerMin)*1.1 {
 		return true
 	}
 
-	// Check tokens per minute
+	// Check tokens per minute with burst allowance (10% over)
 	tokenUsage, _ := s.store.GetUsageInWindow(pCfg.ID, key.ID, "tokens", 60) // 60 seconds window
-	if tokenUsage >= float64(key.LimitTokensPerMin) {
+	if tokenUsage >= float64(key.LimitTokensPerMin)*1.1 {
 		return true
 	}
 

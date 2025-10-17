@@ -133,6 +133,23 @@ func (p *GeminiProvider) Generate(ctx context.Context, req *LLMRequest) (*LLMRes
 	return nil, fmt.Errorf("unexpected error in retry loop")
 }
 
+func (p *GeminiProvider) GenerateStream(ctx context.Context, req *LLMRequest) (<-chan *LLMStreamResponse, error) {
+	// For now, return non-streaming response as single chunk
+	streamChan := make(chan *LLMStreamResponse, 1)
+
+	go func() {
+		defer close(streamChan)
+		resp, err := p.Generate(ctx, req)
+		if err != nil {
+			streamChan <- &LLMStreamResponse{Text: fmt.Sprintf("Error: %v", err), Done: true}
+			return
+		}
+		streamChan <- &LLMStreamResponse{Text: resp.Text, FinishReason: resp.FinishReason, Done: true}
+	}()
+
+	return streamChan, nil
+}
+
 func (p *GeminiProvider) ListModels(ctx context.Context) ([]string, error) {
-	return []string{"gemini-1.5-pro", "gemini-1.5-flash"}, nil
+	return []string{"gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"}, nil
 }

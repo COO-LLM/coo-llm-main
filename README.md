@@ -25,7 +25,7 @@ COO-LLM is a high-performance reverse proxy that intelligently distributes reque
 
 ### 🏢 Enterprise-Ready
 - **🔌 Extensible Architecture**: Plugin system for custom providers, storage backends, and logging
-- **📊 Production Observability**: Prometheus metrics, structured logging, and health checks
+- **📊 Production Observability**: Prometheus metrics, structured logging, admin API for metrics, and health checks
 - **⚙️ Configuration Management**: YAML-based configuration with environment variable support
 - **🔒 Security**: API key masking, secure storage, and authentication controls
 
@@ -51,7 +51,8 @@ server:
   admin_api_key: "admin-secret"
 
 llm_providers:
-  - type: "openai"
+  - id: "openai"
+    type: "openai"
     api_keys: ["\${OPENAI_API_KEY}"]
     base_url: "https://api.openai.com"
     model: "gpt-4o"
@@ -62,7 +63,8 @@ llm_providers:
       req_per_min: 200
       tokens_per_min: 100000
 
-  - type: "gemini"
+  - id: "gemini"
+    type: "gemini"
     api_keys: ["\${GEMINI_API_KEY}"]
     base_url: "https://generativelanguage.googleapis.com"
     model: "gemini-1.5-pro"
@@ -73,12 +75,13 @@ llm_providers:
       req_per_min: 150
       tokens_per_min: 80000
 
-model_aliases:
-  gpt-4o: openai:gpt-4o
-  gemini-pro: gemini:gemini-1.5-pro
+api_keys:
+  - key: "test-key"
+    allowed_providers: ["*"]
+    description: "Test API key"
 
 policy:
-  strategy: "hybrid"
+  algorithm: "hybrid"
   priority: "balanced"
   retry:
     max_attempts: 3

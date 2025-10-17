@@ -215,6 +215,132 @@ logging:
     endpoint: "/metrics"
 ```
 
+## Admin API
+
+Administrative endpoints for configuration and monitoring (require admin authentication):
+
+### Authentication
+```bash
+curl -H "Authorization: Bearer your-admin-key" http://localhost:2906/admin/v1/config
+```
+
+### Endpoints
+
+#### GET /admin/v1/config
+Get current configuration (sensitive data masked).
+
+**Response:**
+```json
+{
+  "version": "1.0",
+  "server": {
+    "listen": ":2906",
+    "admin_api_key": "****"
+  },
+  "llm_providers": [...],
+  "api_keys": [...]
+}
+```
+
+#### POST /admin/v1/config/validate
+Validate configuration without applying.
+
+**Request Body:** Full config JSON
+**Response:** `{"message": "Config is valid"}` or error
+
+#### GET /admin/v1/metrics
+Retrieve historical metrics data.
+
+**Query Parameters:**
+- `name`: Metric name (`latency`, `tokens`, `cost`) - default: `latency`
+- `start`: Start timestamp (Unix seconds) - default: 1 hour ago
+- `end`: End timestamp (Unix seconds) - default: now
+
+**Response:**
+```json
+{
+  "name": "latency",
+  "start": 1700000000,
+  "end": 1700003600,
+  "points": [
+    {
+      "value": 150.5,
+      "timestamp": 1700000100
+    }
+  ]
+}
+```
+
+**Metrics Tags:** `provider`, `key`, `model`, `client_key`
+
+#### GET /admin/v1/clients
+Get aggregated statistics per client API key.
+
+**Query Parameters:**
+- `start`: Start timestamp (Unix seconds) - default: 24 hours ago
+- `end`: End timestamp (Unix seconds) - default: now
+
+**Response:**
+```json
+{
+  "start": 1700000000,
+  "end": 1700003600,
+  "client_stats": {
+    "test-12": {
+      "queries": 150,
+      "tokens": 25000,
+      "cost": 0.125
+    },
+    "gemini-only": {
+      "queries": 75,
+      "tokens": 15000,
+      "cost": 0.075
+    }
+  }
+}
+```
+
+#### GET /admin/v1/stats
+Get aggregated statistics with flexible grouping and filtering.
+
+**Query Parameters:**
+- `group_by`: Comma-separated list of dimensions to group by (e.g., `client_key,provider`) - default: `client_key`
+- `start`: Start timestamp (Unix seconds) - default: 24 hours ago
+- `end`: End timestamp (Unix seconds) - default: now
+- `client_key`: Filter by specific client key
+- `provider`: Filter by specific provider
+- `key`: Filter by specific provider key
+
+**Supported group_by dimensions:**
+- `client_key`: Group by client API key
+- `provider`: Group by provider ID
+- `key`: Group by provider key ID
+- `model`: Group by model name
+
+**Response:**
+```json
+{
+  "start": 1700000000,
+  "end": 1700003600,
+  "group_by": ["client_key", "provider"],
+  "filters": {"client_key": "test-12"},
+  "stats": {
+    "test-12": {
+      "openai": {
+        "queries": 100,
+        "tokens": 15000,
+        "cost": 0.075
+      },
+      "gemini": {
+        "queries": 50,
+        "tokens": 10000,
+        "cost": 0.050
+      }
+    }
+  }
+}
+```
+
 ## Error Responses
 
 All endpoints return standard HTTP status codes:

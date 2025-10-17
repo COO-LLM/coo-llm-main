@@ -131,8 +131,11 @@ type Policy struct {
 }
 
 type CacheConfig struct {
-	Enabled    bool  `yaml:"enabled" mapstructure:"enabled"`
-	TTLSeconds int64 `yaml:"ttl_seconds" mapstructure:"ttl_seconds"` // Cache TTL
+	Enabled             bool    `yaml:"enabled" mapstructure:"enabled"`
+	TTLSeconds          int64   `yaml:"ttl_seconds" mapstructure:"ttl_seconds"` // Cache TTL
+	SemanticEnabled     bool    `yaml:"semantic_enabled" mapstructure:"semantic_enabled"`
+	EmbeddingModel      string  `yaml:"embedding_model" mapstructure:"embedding_model"`
+	SimilarityThreshold float64 `yaml:"similarity_threshold" mapstructure:"similarity_threshold"`
 }
 
 type RetryConfig struct {
@@ -231,6 +234,9 @@ func LoadConfig(path string) (*Config, error) {
 		cfg.Policy.Retry.Interval = 1 * time.Second
 		cfg.Policy.Cache.Enabled = true
 		cfg.Policy.Cache.TTLSeconds = 10
+		cfg.Policy.Cache.SemanticEnabled = false
+		cfg.Policy.Cache.EmbeddingModel = "text-embedding-ada-002"
+		cfg.Policy.Cache.SimilarityThreshold = 0.9
 
 		if err := viper.Unmarshal(&cfg); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal from env: %w", err)

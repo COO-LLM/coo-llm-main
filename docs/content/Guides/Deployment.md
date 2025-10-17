@@ -82,8 +82,7 @@ flowchart TD
        allowed_providers: ["*"]
        description: "Test key for development"
 
-   model_aliases:
-     gpt-4o: openai-prod:gpt-4o
+    # Use "openai-prod:gpt-4o" directly (no model_aliases needed)
    ```
 
 4. **Run:**
@@ -95,7 +94,7 @@ flowchart TD
    ```bash
    curl -X POST http://localhost:2906/v1/chat/completions \
      -H "Authorization: Bearer test-key" \
-     -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
+     -d '{"model": "openai:gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
    ```
 
 ### Docker Deployment
@@ -277,8 +276,7 @@ data:
         type: openai
         api_keys: ["${OPENAI_API_KEY}"]
         model: gpt-4o
-    model_aliases:
-      gpt-4o: openai:gpt-4o
+    # Use "openai:gpt-4o" directly (no model_aliases needed)
 ```
 
 ### AWS ECS
@@ -555,7 +553,7 @@ echo $OPENAI_API_KEY
 # Test basic connectivity
 curl -X POST http://localhost:2906/v1/chat/completions \
   -H "Authorization: Bearer test-key" \
-  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "openai:gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
 
 # Check logs
 tail -f logs/llm.log

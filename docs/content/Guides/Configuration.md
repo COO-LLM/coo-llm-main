@@ -97,28 +97,27 @@ api_keys:
     allowed_providers: ["*"]  # Access all providers
     description: "Default API key for all providers"
 
-model_aliases:
-  # OpenAI models
-  gpt-4o: openai:gpt-4o
-  gpt-4o-mini: openai:gpt-4o-mini
-  gpt-4-turbo: openai:gpt-4-turbo
-  gpt-4: openai:gpt-4
-  gpt-3.5-turbo: openai:gpt-3.5-turbo
-  gpt-3.5-turbo-instruct: openai:gpt-3.5-turbo-instruct
-  # Gemini models
-  gemini-1.5-pro: gemini:gemini-1.5-pro
-  gemini-2.0-pro: gemini:gemini-2.0-pro
-  gemini-2.0-flash: gemini:gemini-2.0-flash
-  gemini-2.5-pro: gemini:gemini-2.5-pro
-  gemini-2.5-flash: gemini:gemini-2.5-flash
-  # Claude models
-  claude-3-opus: claude:claude-3-opus-20240229
-  claude-3-sonnet: claude:claude-3-sonnet-20240229
-  claude-3-haiku: claude:claude-3-haiku-20240307
-  claude-3-5-sonnet: claude:claude-3-5-sonnet-20240620
-  opus-4.1: claude:opus-4.1
-  sonnet-4.5: claude:sonnet-4.5
-  haiku-3.5: claude:haiku-3.5
+# model_aliases: Use inline format to avoid YAML parsing issues with colon characters
+model_aliases: {
+  "gpt-4o": "openai:gpt-4o",
+  "gpt-4o-mini": "openai:gpt-4o-mini",
+  "gpt-4-turbo": "openai:gpt-4-turbo",
+  "gpt-4": "openai:gpt-4",
+  "gpt-3.5-turbo": "openai:gpt-3.5-turbo",
+  "gpt-3.5-turbo-instruct": "openai:gpt-3.5-turbo-instruct",
+  "gemini-1.5-pro": "gemini:gemini-1.5-pro",
+  "gemini-2.0-pro": "gemini:gemini-2.0-pro",
+  "gemini-2.0-flash": "gemini:gemini-2.0-flash",
+  "gemini-2.5-pro": "gemini:gemini-2.5-pro",
+  "gemini-2.5-flash": "gemini:gemini-2.5-flash",
+  "claude-3-opus": "claude:claude-3-opus-20240229",
+  "claude-3-sonnet": "claude:claude-3-sonnet-20240229",
+  "claude-3-haiku": "claude:claude-3-haiku-20240307",
+  "claude-3-5-sonnet": "claude:claude-3-5-sonnet-20240620",
+  "opus-4.1": "claude:opus-4.1",
+  "sonnet-4.5": "claude:sonnet-4.5",
+  "haiku-3.5": "claude:haiku-3.5"
+}
 
 policy:
   strategy: "hybrid"
@@ -192,14 +191,16 @@ Used for caching, sessions, and runtime data.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `type` | string | `memory` | Storage type (`memory`, `redis`, `file`, `http`) |
-| `addr` | string | `localhost:6379` | Redis address or HTTP endpoint (for redis/http) |
-| `password` | string | - | Redis password |
-| `api_key` | string | - | API key for HTTP storage |
+| `addr` | string | `localhost:6379` | Redis address, InfluxDB URL, or HTTP endpoint |
+| `password` | string | - | Redis password or InfluxDB token |
+| `api_key` | string | - | API key for HTTP storage or InfluxDB org |
+| `database` | string | - | Database name for MongoDB or InfluxDB bucket |
 
 **Storage Types:**
 - `memory`: In-memory storage (fast, not persistent)
 - `file`: File-based storage (persistent, local)
 - `redis`: Redis database (persistent, distributed)
+- `influxdb`: InfluxDB time-series database (historical metrics, persistent)
 - `http`: HTTP endpoint storage (remote API)
 
 ### LLM Provider Configuration
@@ -213,8 +214,8 @@ Array of LLM provider configurations:
 | `api_keys` | []string | Array of API keys for load balancing and failover |
 | `base_url` | string | Provider API base URL (optional, uses default if not set) |
 | `model` | string | Default model for this provider |
-| `pricing.input_token_cost` | float64 | Cost per 1K input tokens |
-| `pricing.output_token_cost` | float64 | Cost per 1K output tokens |
+| `pricing.input_token_cost` | float64 | Cost per input token |
+| `pricing.output_token_cost` | float64 | Cost per output token |
 | `limits.req_per_min` | int | Request rate limit per key |
 | `limits.tokens_per_min` | int | Token rate limit per key |
 
@@ -255,12 +256,12 @@ Array of client API key configurations:
 
 ### Model Aliases
 
-Map of alias names to provider:model combinations:
+Use provider:model names directly:
 
-```yaml
-model_aliases:
-  gpt-4o: openai-prod:gpt-4o
-  smart-model: gemini-prod:gemini-1.5-pro
+```bash
+# Examples
+"openai:gpt-4o"
+"gemini:gemini-1.5-pro"
 ```
 
 ### Policy Configuration
@@ -279,15 +280,19 @@ Load balancing and routing policy:
 | `cache.enabled` | bool | `true` | Enable response caching |
 | `cache.ttl_seconds` | int64 | `10` | Cache TTL in seconds |
 
-### Model Aliases
+### Model Names
 
-Map of alias names to provider:model combinations:
+Use full provider:model names directly (no aliases needed):
 
-```yaml
-model_aliases:
-  gpt-4: openai:gpt-4
-  smart-model: gemini:gemini-1.5-pro
+```bash
+# Examples
+"openai:gpt-4o"
+"gemini:gemini-2.5-flash"
+"claude:claude-3-opus"
+"grok:grok-beta"
 ```
+
+**Note:** Model aliases were removed due to YAML parsing issues. Use provider:model format instead.
 
 ### Policy Configuration
 
@@ -377,8 +382,7 @@ llm_providers:
     api_keys: ["sk-your-key"]
     model: "gpt-4o"
 
-model_aliases:
-  gpt-4o: openai:gpt-4o
+# model_aliases removed - use provider:model format directly
 ```
 
 ### Production Configuration
@@ -401,9 +405,11 @@ storage:
     type: "file"
     path: "./data/config.json"
   runtime:
-    type: "redis"
-    addr: "redis:6379"
-    password: "${REDIS_PASSWORD}"
+    type: "influxdb"
+    addr: "http://influxdb:8086"
+    password: "${INFLUX_TOKEN}"
+    api_key: "${INFLUX_ORG}"
+    database: "${INFLUX_BUCKET}"
 
 llm_providers:
   - id: "openai-prod"
@@ -437,9 +443,7 @@ api_keys:
     allowed_providers: ["openai-prod", "gemini-prod"]
     description: "Premium client with all providers"
 
-model_aliases:
-  gpt-4o: openai-prod:gpt-4o
-  gemini-pro: gemini-prod:gemini-1.5-pro
+# model_aliases removed - use "openai-prod:gpt-4o" or "gemini-prod:gemini-1.5-pro" directly
 
 policy:
   algorithm: "hybrid"
@@ -458,15 +462,46 @@ Manage configuration via REST API:
 
 ```bash
 # Get current config
-curl http://localhost:2906/admin/v1/config
+curl -H "Authorization: Bearer your-admin-key" http://localhost:2906/admin/v1/config
 
 # Update config
 curl -X POST http://localhost:2906/admin/v1/config \
+  -H "Authorization: Bearer your-admin-key" \
   -H "Content-Type: application/json" \
   -d @new-config.json
 
 # Validate config
 curl -X POST http://localhost:2906/admin/v1/config/validate \
+  -H "Authorization: Bearer your-admin-key" \
   -H "Content-Type: application/json" \
   -d @config.json
+
+# Get metrics data
+curl -H "Authorization: Bearer your-admin-key" \
+  "http://localhost:2906/admin/v1/metrics?name=latency&start=1700000000&end=1700003600"
 ```
+
+### Metrics API
+
+Retrieve historical metrics for monitoring and analytics:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | string | `latency` | Metric name: `latency`, `tokens`, `cost` |
+| `start` | int64 | 1 hour ago | Start timestamp (Unix seconds) |
+| `end` | int64 | now | End timestamp (Unix seconds) |
+
+**Response Format:**
+```json
+{
+  "name": "latency",
+  "start": 1700000000,
+  "end": 1700003600,
+  "points": [
+    {"value": 150.5, "timestamp": 1700000100},
+    {"value": 120.2, "timestamp": 1700000200}
+  ]
+}
+```
+
+Metrics are tagged with `provider`, `key`, `model`, and `client_key` for detailed filtering.
