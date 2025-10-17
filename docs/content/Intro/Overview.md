@@ -73,8 +73,7 @@ llm_providers:
       req_per_min: 200
       tokens_per_min: 100000
 
-model_aliases:
-  gpt-4o: openai-prod:gpt-4o
+# Use "openai-prod:gpt-4o" directly (model_aliases removed)
 EOF
 
 # Run COO-LLM
@@ -83,7 +82,7 @@ EOF
 # Use like OpenAI API
 curl -X POST http://localhost:2906/v1/chat/completions \
   -H "Authorization: Bearer your-key" \
-  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "openai:gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 ## Getting Started

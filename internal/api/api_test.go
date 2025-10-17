@@ -16,6 +16,7 @@ import (
 	"github.com/user/coo-llm/internal/config"
 	"github.com/user/coo-llm/internal/log"
 	"github.com/user/coo-llm/internal/provider"
+	"github.com/user/coo-llm/internal/store"
 )
 
 func TestModelsEndpoint(t *testing.T) {
@@ -76,7 +77,7 @@ func TestChatCompletionsEndpoint(t *testing.T) {
 	logger := log.NewLogger(&config.Logging{})
 
 	r := chi.NewRouter()
-	SetupRoutes(r, selector, logger, reg, cfg)
+	SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	reqBody := map[string]any{
 		"model": "gpt-4o",
@@ -127,7 +128,7 @@ func TestChatCompletionsEndpoint_InvalidModel(t *testing.T) {
 	logger := log.NewLogger(&config.Logging{})
 
 	r := chi.NewRouter()
-	SetupRoutes(r, selector, logger, reg, cfg)
+	SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	reqBody := map[string]any{
 		"messages": []map[string]string{
@@ -206,7 +207,7 @@ func TestChatCompletionsEndpoint_RetryOnFailure(t *testing.T) {
 	logger := log.NewLogger(&config.Logging{})
 
 	r := chi.NewRouter()
-	SetupRoutes(r, selector, logger, reg, cfg)
+	SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	reqBody := map[string]any{
 		"model": "gpt-4o",
@@ -269,7 +270,7 @@ func TestChatCompletionsEndpoint_Caching(t *testing.T) {
 	logger := log.NewLogger(&config.Logging{})
 
 	r := chi.NewRouter()
-	SetupRoutes(r, selector, logger, reg, cfg)
+	SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	reqBody := map[string]any{
 		"model": "gpt-4o",
@@ -347,7 +348,7 @@ func TestChatCompletionsEndpoint_ConversationHistory(t *testing.T) {
 	logger := log.NewLogger(&config.Logging{})
 
 	r := chi.NewRouter()
-	SetupRoutes(r, selector, logger, reg, cfg)
+	SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	reqBody := map[string]any{
 		"model": "gpt-4o",
@@ -398,6 +399,14 @@ func (m *mockProvider) Generate(ctx context.Context, req *provider.LLMRequest) (
 		FinishReason: "stop",
 	}, nil
 }
+func (m *mockProvider) GenerateStream(ctx context.Context, req *provider.LLMRequest) (<-chan *provider.LLMStreamResponse, error) {
+	streamChan := make(chan *provider.LLMStreamResponse, 1)
+	go func() {
+		defer close(streamChan)
+		streamChan <- &provider.LLMStreamResponse{Text: "Hello back", Done: true}
+	}()
+	return streamChan, nil
+}
 func (m *mockProvider) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"gpt-4o"}, nil
 }
@@ -412,6 +421,12 @@ func (m *mockStore) GetUsageInWindow(provider, keyID, metric string, windowSecon
 }
 func (m *mockStore) SetCache(key, value string, ttlSeconds int64) error { return nil }
 func (m *mockStore) GetCache(key string) (string, error)                { return "", nil }
+func (m *mockStore) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	return nil
+}
+func (m *mockStore) GetMetrics(name string, tags map[string]string, start, end int64) ([]store.MetricPoint, error) {
+	return []store.MetricPoint{}, nil
+}
 
 type mockProviderWithRetry struct {
 	callCount int
@@ -430,6 +445,14 @@ func (m *mockProviderWithRetry) Generate(ctx context.Context, req *provider.LLMR
 		OutputTokens: 5,
 		FinishReason: "stop",
 	}, nil
+}
+func (m *mockProviderWithRetry) GenerateStream(ctx context.Context, req *provider.LLMRequest) (<-chan *provider.LLMStreamResponse, error) {
+	streamChan := make(chan *provider.LLMStreamResponse, 1)
+	go func() {
+		defer close(streamChan)
+		streamChan <- &provider.LLMStreamResponse{Text: "Hello back after retry", Done: true}
+	}()
+	return streamChan, nil
 }
 func (m *mockProviderWithRetry) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"gpt-4o"}, nil
@@ -459,6 +482,12 @@ func (m *mockStoreWithCache) GetCache(key string) (string, error) {
 	}
 	return "", nil
 }
+func (m *mockStoreWithCache) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	return nil
+}
+func (m *mockStoreWithCache) GetMetrics(name string, tags map[string]string, start, end int64) ([]store.MetricPoint, error) {
+	return []store.MetricPoint{}, nil
+}
 
 type mockProviderWithMessages struct {
 	receivedMessages bool
@@ -476,6 +505,14 @@ func (m *mockProviderWithMessages) Generate(ctx context.Context, req *provider.L
 		OutputTokens: 5,
 		FinishReason: "stop",
 	}, nil
+}
+func (m *mockProviderWithMessages) GenerateStream(ctx context.Context, req *provider.LLMRequest) (<-chan *provider.LLMStreamResponse, error) {
+	streamChan := make(chan *provider.LLMStreamResponse, 1)
+	go func() {
+		defer close(streamChan)
+		streamChan <- &provider.LLMStreamResponse{Text: "Response to conversation", Done: true}
+	}()
+	return streamChan, nil
 }
 func (m *mockProviderWithMessages) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"gpt-4o"}, nil

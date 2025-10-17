@@ -13,6 +13,7 @@ import (
 type LLMProvider interface {
 	Name() string
 	Generate(ctx context.Context, req *LLMRequest) (*LLMResponse, error)
+	GenerateStream(ctx context.Context, req *LLMRequest) (<-chan *LLMStreamResponse, error)
 	ListModels(ctx context.Context) ([]string, error)
 }
 
@@ -23,6 +24,7 @@ const (
 	ProviderOpenAI ProviderType = "openai"
 	ProviderGemini ProviderType = "gemini"
 	ProviderClaude ProviderType = "claude"
+	ProviderGrok   ProviderType = "grok"
 )
 
 // KeyUsage tracks usage for each API key
@@ -142,6 +144,8 @@ type LLMRequest struct {
 	Messages  []map[string]interface{} `json:"messages,omitempty"`
 	Model     string                   `json:"model,omitempty"`
 	MaxTokens int                      `json:"max_tokens,omitempty"`
+	Stream    bool                     `json:"stream,omitempty"`
+	User      string                   `json:"user,omitempty"`
 	Params    map[string]any           `json:"params,omitempty"`
 }
 
@@ -154,6 +158,13 @@ type LLMResponse struct {
 	FinishReason string `json:"finish_reason"`
 }
 
+// LLMStreamResponse represents a streaming response chunk
+type LLMStreamResponse struct {
+	Text         string `json:"text,omitempty"`
+	FinishReason string `json:"finish_reason,omitempty"`
+	Done         bool   `json:"done"`
+}
+
 // NewLLMProvider creates a new LLM provider based on config
 func NewLLMProvider(config *LLMConfig) (LLMProvider, error) {
 	switch config.Type {
@@ -163,6 +174,8 @@ func NewLLMProvider(config *LLMConfig) (LLMProvider, error) {
 		return NewGeminiProvider(config), nil
 	case ProviderClaude:
 		return NewClaudeProvider(config), nil
+	case ProviderGrok:
+		return NewGrokProvider(config), nil
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", config.Type)
 	}

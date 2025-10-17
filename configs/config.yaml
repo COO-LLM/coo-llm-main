@@ -60,31 +60,10 @@ api_keys:
     allowed_providers: ["*"]  # Access all providers
     description: "Default API key for all providers"
 
-model_aliases:
-  # OpenAI models
-  gpt-4o: openai:gpt-4o
-  gpt-4o-mini: openai:gpt-4o-mini
-  gpt-4-turbo: openai:gpt-4-turbo
-  gpt-4: openai:gpt-4
-  gpt-3.5-turbo: openai:gpt-3.5-turbo
-  gpt-3.5-turbo-instruct: openai:gpt-3.5-turbo-instruct
-  # Gemini models
-  gemini-1.5-pro: gemini:gemini-1.5-pro
-  gemini-2.0-pro: gemini:gemini-2.0-pro
-  gemini-2.0-flash: gemini:gemini-2.0-flash
-  gemini-2.5-pro: gemini:gemini-2.5-pro
-  gemini-2.5-flash: gemini:gemini-2.5-flash
-  # Claude models
-  claude-3-opus: claude:claude-3-opus-20240229
-  claude-3-sonnet: claude:claude-3-sonnet-20240229
-  claude-3-haiku: claude:claude-3-haiku-20240307
-  claude-3-5-sonnet: claude:claude-3-5-sonnet-20240620
-  opus-4.1: claude:opus-4.1
-  sonnet-4.5: claude:sonnet-4.5
-  haiku-3.5: claude:haiku-3.5
+# model_aliases removed due to YAML parsing bug with colon characters in values
+# Workaround: Use model names directly (e.g., "openai:gpt-4o") or define aliases at runtime
 
 policy:
-  strategy: "hybrid"
   algorithm: "hybrid"   # "round_robin", "least_loaded", "hybrid"
   priority: "balanced"  # "balanced", "cost", "req", "token" (auto-sets weights)
   hybrid_weights:       # Auto-set based on priority, or customize

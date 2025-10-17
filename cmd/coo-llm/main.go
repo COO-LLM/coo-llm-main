@@ -91,6 +91,8 @@ func main() {
 			os.Exit(1)
 		}
 		runtimeStore = dynamoStore
+	case "influxdb":
+		runtimeStore = store.NewInfluxDBStore(cfg.Storage.Runtime.Addr, cfg.Storage.Runtime.Password, cfg.Storage.Runtime.APIKey, cfg.Storage.Runtime.Database, logger.GetLogger())
 	case "memory":
 		runtimeStore = store.NewMemoryStore(logger.GetLogger())
 	default:
@@ -104,7 +106,8 @@ func main() {
 	r := chi.NewRouter()
 
 	// API routes
-	api.SetupRoutes(r, selector, logger, reg, cfg)
+	api.SetupAdminRoutes(r, cfg, runtimeStore, selector)
+	api.SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	// Metrics
 	if cfg.Logging.Prometheus.Enabled {

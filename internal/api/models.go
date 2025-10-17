@@ -77,8 +77,9 @@ func AuthMiddleware(apiKeyConfigs []config.APIKeyConfig) func(http.Handler) http
 				return
 			}
 
-			// Add allowed providers to context
+			// Add allowed providers and API key to context
 			ctx := context.WithValue(r.Context(), "allowed_providers", allowedProviders)
+			ctx = context.WithValue(ctx, "api_key", token) // Use the token as api_key
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

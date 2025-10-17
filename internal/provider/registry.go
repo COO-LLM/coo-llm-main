@@ -24,6 +24,12 @@ func (r *Registry) Register(p Provider) {
 	r.providers[p.Name()] = p
 }
 
+func (r *Registry) RegisterWithID(id string, p Provider) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.providers[id] = p
+}
+
 func (r *Registry) Get(name string) (Provider, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -59,7 +65,7 @@ func (r *Registry) LoadFromConfig(cfg *config.Config) error {
 		if err != nil {
 			return err
 		}
-		r.Register(p)
+		r.RegisterWithID(lp.ID, p)
 	}
 
 	// Fallback to legacy Providers if no LLMProviders
@@ -84,7 +90,7 @@ func (r *Registry) LoadFromConfig(cfg *config.Config) error {
 			if err != nil {
 				return err
 			}
-			r.Register(p)
+			r.RegisterWithID(pCfg.ID, p)
 		}
 	}
 	return nil

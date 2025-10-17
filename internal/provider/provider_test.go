@@ -37,6 +37,11 @@ func TestNewLLMProvider(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "gemini", p.Name())
 
+	cfg.Type = ProviderGrok
+	p, err = NewLLMProvider(&cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "grok", p.Name())
+
 	cfg.Type = "unknown"
 	_, err = NewLLMProvider(&cfg)
 	assert.Error(t, err)
@@ -74,6 +79,20 @@ func TestOpenAIProvider_ListModels(t *testing.T) {
 	models, err := p.ListModels(context.Background())
 	require.NoError(t, err)
 	assert.Contains(t, models, "gpt-4o")
+}
+
+func TestGrokProvider_Name(t *testing.T) {
+	cfg := LLMConfig{Type: ProviderGrok, APIKeys: []string{"test"}}
+	p := NewGrokProvider(&cfg)
+	assert.Equal(t, "grok", p.Name())
+}
+
+func TestGrokProvider_ListModels(t *testing.T) {
+	cfg := LLMConfig{Type: ProviderGrok, APIKeys: []string{"test"}}
+	p := NewGrokProvider(&cfg)
+	models, err := p.ListModels(context.Background())
+	require.NoError(t, err)
+	assert.Contains(t, models, "grok-beta")
 }
 
 func TestLLMConfig_APIKey(t *testing.T) {
@@ -131,6 +150,14 @@ type mockProvider struct {
 func (m *mockProvider) Name() string { return m.name }
 func (m *mockProvider) Generate(ctx context.Context, req *LLMRequest) (*LLMResponse, error) {
 	return &LLMResponse{Text: "ok", TokensUsed: 10, FinishReason: "stop"}, nil
+}
+func (m *mockProvider) GenerateStream(ctx context.Context, req *LLMRequest) (<-chan *LLMStreamResponse, error) {
+	streamChan := make(chan *LLMStreamResponse, 1)
+	go func() {
+		defer close(streamChan)
+		streamChan <- &LLMStreamResponse{Text: "ok", Done: true}
+	}()
+	return streamChan, nil
 }
 func (m *mockProvider) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"model1"}, nil

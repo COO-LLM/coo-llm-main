@@ -88,31 +88,6 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Create Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ steps.get_version.outputs.version }}
-        body: |
-          ## What's Changed
-
-          ### Docker Images
-          - `docker pull ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.get_version.outputs.version }}`
-          - `docker pull ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest`
-          ### Installation
-          ```bash
-          # Use Docker
-          docker run -p 8080:8080 \
-            -e OPENAI_API_KEY="your-key" \
-            ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.get_version.outputs.version }}
-          ```
-
-          For more information, see the [documentation](https://coo-llm.github.io/coo-llm-main/).
-        draft: false
-        prerelease: false
-
   docs:
     runs-on: self-hosted
     needs: test

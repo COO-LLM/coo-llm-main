@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/user/coo-llm/internal/config"
+	"github.com/user/coo-llm/internal/store"
 )
 
 type mockStore struct {
@@ -49,6 +50,12 @@ func (m *mockStore) SetCache(key, value string, ttlSeconds int64) error {
 
 func (m *mockStore) GetCache(key string) (string, error) {
 	return "", nil
+}
+func (m *mockStore) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	return nil
+}
+func (m *mockStore) GetMetrics(name string, tags map[string]string, start, end int64) ([]store.MetricPoint, error) {
+	return []store.MetricPoint{}, nil
 }
 
 func TestRateLimiting(t *testing.T) {

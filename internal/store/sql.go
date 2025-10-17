@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/lib/pq"
@@ -193,4 +194,36 @@ func (s *SQLStore) GetCache(key string) (string, error) {
 
 	s.logger.Debug().Str("operation", "GetCache").Str("key", key).Msg("store operation - cache hit")
 	return value, nil
+}
+
+func (s *SQLStore) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	tagsJSON, _ := json.Marshal(tags)
+	_, err := s.db.Exec(
+		"INSERT INTO metrics (name, value, tags, timestamp) VALUES ($1, $2, $3, $4)",
+		name, value, string(tagsJSON), timestamp,
+	)
+	return err
+}
+
+func (s *SQLStore) GetMetrics(name string, tags map[string]string, start, end int64) ([]MetricPoint, error) {
+	rows, err := s.db.Query(
+		"SELECT value, timestamp FROM metrics WHERE name = $1 AND timestamp >= $2 AND timestamp <= $3",
+		name, start, end,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []MetricPoint
+	for rows.Next() {
+		var point MetricPoint
+		err := rows.Scan(&point.Value, &point.Timestamp)
+		if err != nil {
+			return nil, err
+		}
+		point.Tags = make(map[string]string)
+		points = append(points, point)
+	}
+	return points, nil
 }

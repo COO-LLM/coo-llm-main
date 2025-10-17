@@ -13,6 +13,7 @@ import (
 	"github.com/user/coo-llm/internal/config"
 	"github.com/user/coo-llm/internal/log"
 	"github.com/user/coo-llm/internal/provider"
+	"github.com/user/coo-llm/internal/store"
 )
 
 type ChatCompletionsHandler struct {
@@ -20,10 +21,11 @@ type ChatCompletionsHandler struct {
 	logger   *log.Logger
 	reg      *provider.Registry
 	cfg      *config.Config
+	store    store.RuntimeStore
 }
 
-func NewChatCompletionsHandler(selector *balancer.Selector, logger *log.Logger, reg *provider.Registry, cfg *config.Config) *ChatCompletionsHandler {
-	return &ChatCompletionsHandler{selector: selector, logger: logger, reg: reg, cfg: cfg}
+func NewChatCompletionsHandler(selector *balancer.Selector, logger *log.Logger, reg *provider.Registry, cfg *config.Config, store store.RuntimeStore) *ChatCompletionsHandler {
+	return &ChatCompletionsHandler{selector: selector, logger: logger, reg: reg, cfg: cfg, store: store}
 }
 
 func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -43,27 +45,6 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 	allowedProviders, ok := r.Context().Value("allowed_providers").([]string)
 	if !ok {
 		http.Error(w, `{"error": {"message": "Authentication context missing", "type": "authentication_error"}}`, http.StatusInternalServerError)
-		return
-	}
-
-	// Determine provider from model
-	providerType := h.GetProviderFromModel(model)
-	if providerType == "" {
-		http.Error(w, `{"error": {"message": "Unknown model", "type": "invalid_request_error"}}`, http.StatusBadRequest)
-		return
-	}
-
-	// Check if provider is allowed
-	allowed := false
-	for _, allowedProvider := range allowedProviders {
-		if allowedProvider == "*" || allowedProvider == providerType {
-			allowed = true
-			break
-		}
-	}
-
-	if !allowed {
-		http.Error(w, `{"error": {"message": "Access denied to this provider", "type": "authentication_error"}}`, http.StatusForbidden)
 		return
 	}
 
@@ -88,8 +69,21 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 
 	// Check cache if enabled
 	if h.cfg.Policy.Cache.Enabled && prompt != "" {
-		cacheKey := normalizeText(prompt)
-		if cachedResp, err := h.selector.GetCache(cacheKey); err == nil && cachedResp != "" {
+		var cacheHit bool
+		var cachedResp string
+		var err error
+
+		if h.cfg.Policy.Cache.SemanticEnabled {
+			// Semantic caching
+			cacheHit, cachedResp, err = h.checkSemanticCache(prompt)
+		} else {
+			// Exact match caching
+			cacheKey := normalizeText(prompt)
+			cachedResp, err = h.selector.GetCache(cacheKey)
+			cacheHit = err == nil && cachedResp != ""
+		}
+
+		if cacheHit {
 			// Return cached response
 			var cached map[string]interface{}
 			if json.Unmarshal([]byte(cachedResp), &cached) == nil {
@@ -104,6 +98,16 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 	maxTokens := 1000
 	if mt, ok := req["max_tokens"].(float64); ok {
 		maxTokens = int(mt)
+	}
+
+	stream := false
+	if s, ok := req["stream"].(bool); ok {
+		stream = s
+	}
+
+	user := ""
+	if u, ok := req["user"].(string); ok {
+		user = u
 	}
 
 	// Retry logic
@@ -125,6 +129,19 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 			break
 		}
 
+		// Check if provider is allowed
+		allowed := false
+		for _, allowedProvider := range allowedProviders {
+			if allowedProvider == "*" || allowedProvider == pCfg.ID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			err = fmt.Errorf("access denied to provider %s", pCfg.ID)
+			break
+		}
+
 		prov, err := h.reg.Get(pCfg.ID)
 		if err != nil {
 			break
@@ -135,11 +152,92 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 			Messages:  messages,
 			Model:     modelName,
 			MaxTokens: maxTokens,
+			Stream:    stream,
+			User:      user,
 			Params:    req,
 		}
 
 		ctx, cancel := context.WithTimeout(r.Context(), retryCfg.Timeout)
 		attemptStart := time.Now()
+
+		if stream {
+			streamChan, err := prov.GenerateStream(ctx, providerReq)
+			if err != nil {
+				cancel()
+				break
+			}
+
+			// Handle streaming response
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Connection", "keep-alive")
+
+			flusher, ok := w.(http.Flusher)
+			if !ok {
+				cancel()
+				http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+				return
+			}
+
+			go func() {
+				defer cancel()
+				for chunk := range streamChan {
+					if chunk.Done {
+						if chunk.Text != "" && !strings.HasPrefix(chunk.Text, "Error:") {
+							// Send final usage data
+							usageData := map[string]interface{}{
+								"id":      fmt.Sprintf("%d", time.Now().UnixNano()),
+								"object":  "chat.completion.chunk",
+								"created": time.Now().Unix(),
+								"model":   model,
+								"choices": []map[string]interface{}{
+									{
+										"index":         0,
+										"delta":         map[string]string{},
+										"finish_reason": chunk.FinishReason,
+									},
+								},
+								"usage": map[string]interface{}{
+									"prompt_tokens":     0, // TODO: track properly
+									"completion_tokens": 0,
+									"total_tokens":      0,
+								},
+							}
+							data, _ := json.Marshal(usageData)
+							fmt.Fprintf(w, "data: %s\n\n", data)
+							flusher.Flush()
+						}
+						fmt.Fprintf(w, "data: [DONE]\n\n")
+						flusher.Flush()
+						return
+					}
+
+					chunkData := map[string]interface{}{
+						"id":      fmt.Sprintf("%d", time.Now().UnixNano()),
+						"object":  "chat.completion.chunk",
+						"created": time.Now().Unix(),
+						"model":   model,
+						"choices": []map[string]interface{}{
+							{
+								"index": 0,
+								"delta": map[string]interface{}{
+									"content": chunk.Text,
+								},
+								"finish_reason": nil,
+							},
+						},
+					}
+					data, _ := json.Marshal(chunkData)
+					fmt.Fprintf(w, "data: %s\n\n", data)
+					flusher.Flush()
+				}
+			}()
+
+			// Update usage for streaming (simplified)
+			h.selector.UpdateUsage(pCfg.ID, key.ID, "req", 1)
+			return
+		}
+
 		resp, err = prov.Generate(ctx, providerReq)
 		cancel()
 		latency = time.Since(attemptStart).Milliseconds()
@@ -173,7 +271,19 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Calculate cost
-	cost := (float64(resp.InputTokens)*key.Pricing.InputTokenCost + float64(resp.OutputTokens)*key.Pricing.OutputTokenCost) / 1000000
+	cost := float64(resp.InputTokens)*key.Pricing.InputTokenCost + float64(resp.OutputTokens)*key.Pricing.OutputTokenCost
+
+	// Get client API key from context
+	var clientKey string
+	if key, ok := r.Context().Value("api_key").(string); ok {
+		clientKey = key
+	}
+
+	// Store metrics for historical data
+	tags := map[string]string{"provider": pCfg.ID, "key": key.ID, "model": modelName, "client_key": clientKey}
+	h.store.StoreMetric("latency", float64(latency), tags, time.Now().Unix())
+	h.store.StoreMetric("tokens", float64(resp.TokensUsed), tags, time.Now().Unix())
+	h.store.StoreMetric("cost", cost, tags, time.Now().Unix())
 
 	// Log the request
 	reqID := fmt.Sprintf("%d", time.Now().UnixNano())
@@ -214,9 +324,13 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 
 	// Cache response if enabled
 	if h.cfg.Policy.Cache.Enabled && prompt != "" {
-		cacheKey := normalizeText(prompt)
 		respJSON, _ := json.Marshal(openaiResp)
-		h.selector.SetCache(cacheKey, string(respJSON), h.cfg.Policy.Cache.TTLSeconds)
+		if h.cfg.Policy.Cache.SemanticEnabled {
+			h.setSemanticCache(prompt, string(respJSON))
+		} else {
+			cacheKey := normalizeText(prompt)
+			h.selector.SetCache(cacheKey, string(respJSON), h.cfg.Policy.Cache.TTLSeconds)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -229,6 +343,23 @@ func normalizeText(text string) string {
 	normalized := strings.ToLower(text)
 	normalized = strings.Join(strings.Fields(normalized), "")
 	return normalized
+}
+
+// checkSemanticCache checks for semantically similar cached responses
+func (h *ChatCompletionsHandler) checkSemanticCache(prompt string) (bool, string, error) {
+	// TODO: Implement semantic similarity search
+	// For now, fall back to exact match
+	cacheKey := normalizeText(prompt)
+	cached, err := h.selector.GetCache(cacheKey)
+	return err == nil && cached != "", cached, err
+}
+
+// setSemanticCache stores response with semantic embedding
+func (h *ChatCompletionsHandler) setSemanticCache(prompt, response string) {
+	// TODO: Generate embedding and store with similarity search capability
+	// For now, fall back to exact match
+	cacheKey := normalizeText(prompt)
+	h.selector.SetCache(cacheKey, response, h.cfg.Policy.Cache.TTLSeconds)
 }
 
 // GetProviderFromModel determines the provider ID from a model name
@@ -293,8 +424,8 @@ func (h *ChatCompletionsHandler) GetProviderFromModel(model string) string {
 	return "" // No provider found
 }
 
-func SetupRoutes(r chi.Router, selector *balancer.Selector, logger *log.Logger, reg *provider.Registry, cfg *config.Config) {
-	handler := NewChatCompletionsHandler(selector, logger, reg, cfg)
+func SetupRoutes(r chi.Router, selector *balancer.Selector, logger *log.Logger, reg *provider.Registry, cfg *config.Config, store store.RuntimeStore) {
+	handler := NewChatCompletionsHandler(selector, logger, reg, cfg, store)
 	r.With(AuthMiddleware(cfg.APIKeys)).Post("/v1/chat/completions", handler.Handle)
 
 	SetupModelsRoute(r, cfg)

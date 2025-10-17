@@ -284,3 +284,13 @@ func (d *DynamoDBStore) GetCache(key string) (string, error) {
 	d.logger.Debug().Str("operation", "GetCache").Str("key", key).Msg("store operation - cache hit")
 	return valueStr.Value, nil
 }
+
+func (d *DynamoDBStore) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	// TODO: implement DynamoDB metric storage
+	return nil
+}
+
+func (d *DynamoDBStore) GetMetrics(name string, tags map[string]string, start, end int64) ([]MetricPoint, error) {
+	// TODO: implement DynamoDB metric query
+	return []MetricPoint{}, nil
+}
