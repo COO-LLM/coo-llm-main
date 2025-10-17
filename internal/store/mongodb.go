@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -225,8 +226,8 @@ func (m *MongoDBStore) GetUsageInWindow(provider, keyID, metric string, windowSe
 	}
 
 	pipeline := mongo.Pipeline{
-		{{"$match", filter}},
-		{{"$group", bson.M{
+		{primitive.E{Key: "$match", Value: filter}},
+		{primitive.E{Key: "$group", Value: bson.M{
 			"_id":   nil,
 			"total": bson.M{"$sum": "$delta"},
 		}}},

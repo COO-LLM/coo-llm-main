@@ -9,11 +9,11 @@ import (
 )
 
 type GeminiProvider struct {
-	cfg    LLMConfig
+	cfg    *LLMConfig
 	client *genai.Client
 }
 
-func NewGeminiProvider(cfg LLMConfig) *GeminiProvider {
+func NewGeminiProvider(cfg *LLMConfig) *GeminiProvider {
 	// Client will be created in Generate method to allow key rotation
 	return &GeminiProvider{cfg: cfg, client: nil}
 }

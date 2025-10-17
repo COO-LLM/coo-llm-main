@@ -55,7 +55,7 @@ func (r *Registry) LoadFromConfig(cfg *config.Config) error {
 			Pricing: lp.Pricing,
 			Limits:  lp.Limits,
 		}
-		p, err := NewLLMProvider(llmCfg)
+		p, err := NewLLMProvider(&llmCfg)
 		if err != nil {
 			return err
 		}
@@ -80,7 +80,7 @@ func (r *Registry) LoadFromConfig(cfg *config.Config) error {
 					TokensPerMin: pCfg.Keys[0].LimitTokensPerMin,
 				},
 			}
-			p, err := NewLLMProvider(llmCfg)
+			p, err := NewLLMProvider(&llmCfg)
 			if err != nil {
 				return err
 			}

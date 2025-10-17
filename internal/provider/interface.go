@@ -56,7 +56,7 @@ type Limits struct {
 }
 
 // APIKey returns the first API key for backward compatibility
-func (c LLMConfig) APIKey() string {
+func (c *LLMConfig) APIKey() string {
 	if len(c.APIKeys) > 0 {
 		return c.APIKeys[0]
 	}
@@ -155,7 +155,7 @@ type LLMResponse struct {
 }
 
 // NewLLMProvider creates a new LLM provider based on config
-func NewLLMProvider(config LLMConfig) (LLMProvider, error) {
+func NewLLMProvider(config *LLMConfig) (LLMProvider, error) {
 	switch config.Type {
 	case ProviderOpenAI:
 		return NewOpenAIProvider(config), nil

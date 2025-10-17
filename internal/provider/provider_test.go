@@ -28,17 +28,17 @@ func TestRegistry(t *testing.T) {
 
 func TestNewLLMProvider(t *testing.T) {
 	cfg := LLMConfig{Type: ProviderOpenAI, APIKeys: []string{"test"}, Model: "gpt-4"}
-	p, err := NewLLMProvider(cfg)
+	p, err := NewLLMProvider(&cfg)
 	require.NoError(t, err)
 	assert.Equal(t, "openai", p.Name())
 
 	cfg.Type = ProviderGemini
-	p, err = NewLLMProvider(cfg)
+	p, err = NewLLMProvider(&cfg)
 	require.NoError(t, err)
 	assert.Equal(t, "gemini", p.Name())
 
 	cfg.Type = "unknown"
-	_, err = NewLLMProvider(cfg)
+	_, err = NewLLMProvider(&cfg)
 	assert.Error(t, err)
 }
 
@@ -64,13 +64,13 @@ func TestLoadFromConfig(t *testing.T) {
 
 func TestOpenAIProvider_Name(t *testing.T) {
 	cfg := LLMConfig{Type: ProviderOpenAI, APIKeys: []string{"test"}}
-	p := NewOpenAIProvider(cfg)
+	p := NewOpenAIProvider(&cfg)
 	assert.Equal(t, "openai", p.Name())
 }
 
 func TestOpenAIProvider_ListModels(t *testing.T) {
 	cfg := LLMConfig{Type: ProviderOpenAI, APIKeys: []string{"test"}}
-	p := NewOpenAIProvider(cfg)
+	p := NewOpenAIProvider(&cfg)
 	models, err := p.ListModels(context.Background())
 	require.NoError(t, err)
 	assert.Contains(t, models, "gpt-4o")

@@ -8,11 +8,11 @@ import (
 )
 
 type OpenAIProvider struct {
-	cfg    LLMConfig
+	cfg    *LLMConfig
 	client *openai.Client
 }
 
-func NewOpenAIProvider(cfg LLMConfig) *OpenAIProvider {
+func NewOpenAIProvider(cfg *LLMConfig) *OpenAIProvider {
 	config := openai.DefaultConfig(cfg.APIKey())
 	if cfg.BaseURL != "" {
 		config.BaseURL = cfg.BaseURL

@@ -9,11 +9,11 @@ import (
 )
 
 type ClaudeProvider struct {
-	cfg    LLMConfig
+	cfg    *LLMConfig
 	client anthropic.Client
 }
 
-func NewClaudeProvider(cfg LLMConfig) *ClaudeProvider {
+func NewClaudeProvider(cfg *LLMConfig) *ClaudeProvider {
 	// Client will be created in Generate method to allow key rotation
 	return &ClaudeProvider{cfg: cfg}
 }
