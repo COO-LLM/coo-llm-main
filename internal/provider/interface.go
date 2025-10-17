@@ -77,6 +77,9 @@ func (c *LLMConfig) InitUsages() {
 
 // NextAPIKey returns the next API key in round-robin fashion (thread-safe)
 func (c *LLMConfig) NextAPIKey() string {
+	if len(c.usages) != len(c.APIKeys) {
+		c.InitUsages()
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.APIKeys) == 0 {
@@ -84,9 +87,6 @@ func (c *LLMConfig) NextAPIKey() string {
 	}
 	if c.APIKeys[0] == "" {
 		return ""
-	}
-	if len(c.usages) != len(c.APIKeys) {
-		c.InitUsages()
 	}
 	key := c.APIKeys[0]
 	c.APIKeys = append(c.APIKeys[1:], key)
@@ -96,13 +96,13 @@ func (c *LLMConfig) NextAPIKey() string {
 
 // SelectLeastLoadedKey returns the key with least usage (req + token ratio)
 func (c *LLMConfig) SelectLeastLoadedKey() string {
+	if len(c.usages) != len(c.APIKeys) {
+		c.InitUsages()
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.APIKeys) == 0 {
 		return ""
-	}
-	if len(c.usages) != len(c.APIKeys) {
-		c.InitUsages()
 	}
 
 	minIndex := 0
