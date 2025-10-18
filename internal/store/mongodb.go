@@ -305,3 +305,59 @@ func (m *MongoDBStore) GetCache(key string) (string, error) {
 	m.logger.Debug().Str("operation", "GetCache").Str("key", key).Msg("store operation - cache hit")
 	return doc.Value, nil
 }
+
+func (m *MongoDBStore) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	ctx := context.Background()
+	collection := m.database.Collection("metrics")
+
+	doc := bson.M{
+		"name":      name,
+		"value":     value,
+		"tags":      tags,
+		"timestamp": timestamp,
+	}
+
+	_, err := collection.InsertOne(ctx, doc)
+	return err
+}
+
+func (m *MongoDBStore) GetMetrics(name string, tags map[string]string, start, end int64) ([]MetricPoint, error) {
+	ctx := context.Background()
+	collection := m.database.Collection("metrics")
+
+	filter := bson.M{
+		"name": name,
+		"timestamp": bson.M{
+			"$gte": start,
+			"$lte": end,
+		},
+	}
+
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var points []MetricPoint
+	for cursor.Next(ctx) {
+		var doc struct {
+			Value     float64           `bson:"value"`
+			Timestamp int64             `bson:"timestamp"`
+			Tags      map[string]string `bson:"tags"`
+		}
+		err := cursor.Decode(&doc)
+		if err != nil {
+			return nil, err
+		}
+		if doc.Tags == nil {
+			doc.Tags = make(map[string]string)
+		}
+		points = append(points, MetricPoint{
+			Value:     doc.Value,
+			Timestamp: doc.Timestamp,
+			Tags:      doc.Tags,
+		})
+	}
+	return points, nil
+}

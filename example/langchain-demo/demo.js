@@ -8,7 +8,7 @@ async function main() {
 
   // Initialize ChatOpenAI with custom base URL pointing to our COO-LLM server
   const llm = new ChatOpenAI({
-    modelName: 'gemini-2.5-flash',
+    modelName: 'gemini-prod:gemini-2.5-flash',
     openAIApiKey: 'test-12', // Valid API key for COO-LLM server
     temperature: 0.7,
     configuration: {
@@ -45,6 +45,20 @@ async function main() {
         total_tokens: response2.usage_metadata.total_tokens,
       });
     }
+    // Check for cost in response metadata (COO-LLM specific)
+    if (response2.response_metadata && response2.response_metadata.usage && response2.response_metadata.usage.cost) {
+      console.log('Cost:', response2.response_metadata.usage.cost);
+    }
+
+    // Test 4: Streaming response
+    console.log('\nTesting streaming response:');
+    const stream = await llm.stream('Tell me a short story.');
+    let fullResponse = '';
+    for await (const chunk of stream) {
+      process.stdout.write(chunk.content);
+      fullResponse += chunk.content;
+    }
+    console.log('\nFull streaming response:', fullResponse);
 
     console.log('\n🎉 All tests passed! COO-LLM is compatible with LangChain!');
 

@@ -128,6 +128,28 @@ func (p *ClaudeProvider) Generate(ctx context.Context, req *LLMRequest) (*LLMRes
 	return nil, fmt.Errorf("unexpected error in retry loop")
 }
 
+func (p *ClaudeProvider) GenerateStream(ctx context.Context, req *LLMRequest) (<-chan *LLMStreamResponse, error) {
+	// For now, return non-streaming response as single chunk
+	streamChan := make(chan *LLMStreamResponse, 1)
+
+	go func() {
+		defer close(streamChan)
+		resp, err := p.Generate(ctx, req)
+		if err != nil {
+			streamChan <- &LLMStreamResponse{Text: fmt.Sprintf("Error: %v", err), Done: true}
+			return
+		}
+		streamChan <- &LLMStreamResponse{Text: resp.Text, FinishReason: resp.FinishReason, Done: true}
+	}()
+
+	return streamChan, nil
+}
+
+func (p *ClaudeProvider) CreateEmbeddings(ctx context.Context, req *EmbeddingsRequest) (*EmbeddingsResponse, error) {
+	// Claude doesn't have native embeddings support
+	return nil, fmt.Errorf("embeddings not supported by Claude provider")
+}
+
 func (p *ClaudeProvider) ListModels(ctx context.Context) ([]string, error) {
-	return []string{"claude-3-opus-20240229", "claude-3-sonnet-20240229"}, nil
+	return []string{"claude-3-opus", "claude-3-sonnet", "claude-3-haiku"}, nil
 }

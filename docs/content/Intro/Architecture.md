@@ -54,11 +54,11 @@ flowchart TD
 
     D --> E[Storage & Observability]:::storage
 
-    subgraph E["Storage & Observability"]
-        E1[Runtime Storage<br/>internal/store<br/>Redis, Memory, HTTP, File]:::storage
-        E2[Configuration<br/>internal/config<br/>YAML parsing with viper<br/>Environment variables<br/>Validation]:::storage
-        E3[Logging<br/>internal/log<br/>Structured JSON  <Zerolog ><br/>File rotation<br/>Prometheus metrics]:::storage
-    end
+     subgraph E["Storage & Observability"]
+         E1[Runtime Storage<br/>internal/store<br/>Redis, Memory, HTTP, File<br/>Client/Metrics/Algorithm Stores]:::storage
+         E2[Configuration<br/>internal/config<br/>YAML parsing with viper<br/>Environment variables<br/>Validation]:::storage
+         E3[Logging<br/>internal/log<br/>Structured JSON  <Zerolog ><br/>File rotation<br/>Prometheus metrics<br/>Audit logging]:::storage
+     end
 
     E --> F[External LLM Providers]:::external
 
@@ -147,7 +147,7 @@ Runtime storage for metrics and caching:
 **Key Files:**
 - `internal/store/interface.go` - Storage interfaces
 - `internal/store/redis.go` - Redis implementation
-- `internal/store/memory.go` - In-memory storage
+
 - `internal/store/http.go` - HTTP-based remote storage
 - `internal/store/file.go` - File-based storage
 

@@ -33,13 +33,18 @@ flowchart TD
     K[Claude Provider<br/>claude.go]:::provider
     K --> L[Claude API<br/>messages]:::external
 
+    M[Grok Provider<br/>grok.go]:::provider
+    M --> N[Grok API<br/>chat/completions]:::external
+
     B --> G
     B --> I
     B --> K
+    B --> M
 
     E --> G
     E --> I
     E --> K
+    E --> M
 ```
 
 ## Supported Providers
@@ -146,6 +151,37 @@ llm_providers:
 
 **Rate Limits:** Varies by model (see [Anthropic docs](https://docs.anthropic.com/claude/docs/rate-limits))
 
+### xAI Grok
+
+**Provider Type:** `grok`
+
+**Configuration:**
+```yaml
+llm_providers:
+  - id: "grok-prod"
+    type: "grok"
+    api_keys: ["${GROK_KEY_1}"]
+    base_url: "https://api.x.ai/v1"
+    model: "grok-beta"
+    pricing:
+      input_token_cost: 0.005
+      output_token_cost: 0.015
+    limits:
+      req_per_min: 30
+      tokens_per_min: 15000
+```
+
+**Supported Models:**
+- `grok-beta`
+
+**Features:**
+- Chat completions with conversation history
+- Token usage tracking
+- Error handling and retries
+- Rate limit management
+
+**Rate Limits:** Based on xAI tier (see [xAI docs](https://docs.x.ai/))
+
 ## Using Custom Endpoints
 
 For models that follow OpenAI, Gemini, or Claude API standards, you can use the respective provider type and specify a custom `base_url`:
@@ -169,6 +205,7 @@ llm_providers:
 - `openai`: For OpenAI-compatible APIs
 - `gemini`: For Gemini-compatible APIs
 - `claude`: For Claude-compatible APIs
+- `grok`: For Grok-compatible APIs
 
 If your model doesn't follow these standards, consider using the official SDKs directly or contributing a new provider implementation.
 
@@ -180,6 +217,8 @@ All providers implement the `LLMProvider` interface defined in `internal/provide
 type LLMProvider interface {
     Name() string
     Generate(ctx context.Context, req *LLMRequest) (*LLMResponse, error)
+    GenerateStream(ctx context.Context, req *LLMRequest) (<-chan *LLMStreamResponse, error)
+    CreateEmbeddings(ctx context.Context, req *EmbeddingsRequest) (*EmbeddingsResponse, error)
     ListModels(ctx context.Context) ([]string, error)
 }
 ```
@@ -188,11 +227,13 @@ type LLMProvider interface {
 
 ```go
 type LLMRequest struct {
-    Prompt    string                   `json:"prompt"`
-    Messages  []map[string]interface{} `json:"messages,omitempty"`
-    Model     string                   `json:"model,omitempty"`
-    MaxTokens int                      `json:"max_tokens,omitempty"`
-    Params    map[string]any           `json:"params,omitempty"`
+    Prompt    string           `json:"prompt"`
+    Messages  []map[string]any `json:"messages,omitempty"`
+    Model     string           `json:"model,omitempty"`
+    MaxTokens int              `json:"max_tokens,omitempty"`
+    Stream    bool             `json:"stream,omitempty"`
+    User      string           `json:"user,omitempty"`
+    Params    map[string]any   `json:"params,omitempty"`
 }
 ```
 
@@ -205,6 +246,43 @@ type LLMResponse struct {
     OutputTokens int    `json:"output_tokens"`
     TokensUsed   int    `json:"tokens_used"`
     FinishReason string `json:"finish_reason"`
+}
+```
+
+### Stream Response Structure
+
+```go
+type LLMStreamResponse struct {
+    Text         string `json:"text,omitempty"`
+    FinishReason string `json:"finish_reason,omitempty"`
+    Done         bool   `json:"done"`
+}
+```
+
+### Embeddings Request Structure
+
+```go
+type EmbeddingsRequest struct {
+    Model  string         `json:"model"`
+    Input  []string       `json:"input"`
+    User   string         `json:"user,omitempty"`
+    Params map[string]any `json:"params,omitempty"`
+}
+```
+
+### Embeddings Response Structure
+
+```go
+type EmbeddingsResponse struct {
+    Embeddings []Embedding `json:"embeddings"`
+    Usage      TokenUsage  `json:"usage"`
+}
+
+type Embedding []float64
+
+type TokenUsage struct {
+	PromptTokens int `json:"prompt_tokens"`
+	TotalTokens  int `json:"total_tokens"`
 }
 ```
 
@@ -380,8 +458,7 @@ llm_providers:
       req_per_min: 100
       tokens_per_min: 50000
 
-model_aliases:
-  my-model: my-custom:my-model
+# Use "my-custom:my-model" directly (no aliases needed)
 ```
 
 ## Provider-Specific Features
@@ -402,6 +479,12 @@ model_aliases:
 - Large context windows (200K tokens)
 - Advanced reasoning
 - Constitutional AI safety
+
+### Grok Features
+- Powered by xAI's Grok model
+- Real-time knowledge updates
+- Humorous and helpful responses
+- OpenAI API compatibility
 
 ## Pricing Integration
 

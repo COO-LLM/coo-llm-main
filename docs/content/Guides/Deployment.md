@@ -40,93 +40,93 @@ flowchart TD
     K --> P
 ```
 
-## Quick Start
+## Docker Deployment
 
-### Local Development
+COO-LLM is distributed as a Docker image for easy deployment. All deployment methods use the `khapu2906/coo-llm` image.
 
-1. **Clone and build:**
-   ```bash
-   git clone https://github.com/coo-llm/coo-llm-main.git
-   cd coo-llm
-   go build -o coo-llm ./cmd/coo-llm
-   ```
+### Basic Docker Run
 
-2. **Configure environment:**
-   ```bash
-   export OPENAI_API_KEY="sk-your-key"
-   export GEMINI_API_KEY="your-gemini-key"
-   ```
+```bash
+docker run -d \
+  --name coo-llm \
+  -p 2906:2906 \
+  -e OPENAI_API_KEY="your-key" \
+  khapu2906/coo-llm:latest
+```
 
-3. **Create config:**
-   ```yaml
-   # configs/config.yaml
-   version: "1.0"
-   server:
-     listen: ":2906"
+### With Config File
 
-   llm_providers:
-     - id: "openai-prod"
-       type: "openai"
-       api_keys: ["${OPENAI_API_KEY}"]
-       base_url: "https://api.openai.com"
-       model: "gpt-4o"
-       pricing:
-         input_token_cost: 0.002
-         output_token_cost: 0.01
-       limits:
-         req_per_min: 200
-         tokens_per_min: 100000
+```bash
+# Create config directory and file
+mkdir config
+cat > config/config.yaml << EOF
+version: "1.0"
+server:
+  listen: ":2906"
 
-   api_keys:
-     - key: "test-key"
-       allowed_providers: ["*"]
-       description: "Test key for development"
+llm_providers:
+  - id: "openai"
+    type: "openai"
+    api_keys: ["your-openai-key"]
+    model: "gpt-4o"
 
-   model_aliases:
-     gpt-4o: openai-prod:gpt-4o
-   ```
+api_keys:
+  - key: "test-key"
+    allowed_providers: ["*"]
+EOF
 
-4. **Run:**
-   ```bash
-   ./coo-llm -config configs/config.yaml
-   ```
+# Run with mounted config
+docker run -d \
+  --name coo-llm \
+  -p 2906:2906 \
+  -v $(pwd)/config:/config \
+  khapu2906/coo-llm:latest \
+  --config /config/config.yaml
+```
 
-5. **Test:**
-   ```bash
-   curl -X POST http://localhost:2906/v1/chat/completions \
-     -H "Authorization: Bearer test-key" \
-     -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
-   ```
+### With Custom Web UI
 
-### Docker Deployment
+```bash
+# Assuming custom UI is built in ./webui/
+docker run -d \
+  --name coo-llm \
+  -p 2906:2906 \
+  -v $(pwd)/config:/config \
+  -v $(pwd)/webui:/webui \
+  -e COO_WEB_UI_PATH="/webui" \
+  khapu2906/coo-llm:latest \
+  --config /config/config.yaml
+```
 
-1. **Build image:**
-    ```bash
-    docker build -t coo-llm:latest .
-    ```
+### Docker Compose
 
-2. **Prepare config:**
-    ```bash
-    # Create your config.yaml with API keys and settings
-    mkdir configs
-    # Edit configs/config.yaml
-    ```
+**Full stack with Redis:**
 
-3. **Run container:**
-    ```bash
-    docker run -p 2906:2906 \
-      -e OPENAI_API_KEY="sk-your-key" \
-      -e GEMINI_API_KEY="your-gemini-key" \
-      -v $(pwd)/configs:/app/configs \
-      -v $(pwd)/logs:/app/logs \
-      khapu2906/coo-llm:latest
-    ```
+```yaml
+version: '3.8'
+services:
+  coo-llm:
+    image: khapu2906/coo-llm:latest
+    ports:
+      - "2906:2906"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./config:/config
+      - ./webui:/webui  # Optional
+    command: ["--config", "/config/config.yaml"]
+    depends_on:
+      - redis
 
-**Dockerfile details:**
-- Multi-stage build with Go 1.23
-- Alpine Linux base image for minimal size
-- Non-root user for security
-- Config mounted from host for flexibility and security
+  redis:
+    image: redis:alpine
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+```
 
 ### Docker Compose
 
@@ -277,8 +277,7 @@ data:
         type: openai
         api_keys: ["${OPENAI_API_KEY}"]
         model: gpt-4o
-    model_aliases:
-      gpt-4o: openai:gpt-4o
+    # Use "openai:gpt-4o" directly (no model_aliases needed)
 ```
 
 ### AWS ECS
@@ -555,7 +554,7 @@ echo $OPENAI_API_KEY
 # Test basic connectivity
 curl -X POST http://localhost:2906/v1/chat/completions \
   -H "Authorization: Bearer test-key" \
-  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "openai:gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
 
 # Check logs
 tail -f logs/llm.log

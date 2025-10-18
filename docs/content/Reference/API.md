@@ -27,53 +27,31 @@ COO-LLM supports 3 ways to specify models:
 
 ## Authentication & Authorization Flow
 
-```mermaid
-flowchart TD
-    classDef client fill:#28a745,color:#fff,stroke:#fff,stroke-width:2px
-    classDef auth fill:#ffc107,color:#000,stroke:#000,stroke-width:2px
-    classDef process fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
-    classDef deny fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
+Authentication flow for API requests:
 
-    A[Client Request<br/>with Bearer token]:::client
-    A --> B[Extract API Key<br/>from Authorization header]:::auth
-    B --> C{Key exists in<br/>api_keys config?}:::auth
-
-    C -->|No| D[401 Unauthorized<br/>Invalid API key]:::deny
-    C -->|Yes| E[Get allowed_providers<br/>for this key]:::auth
-    E --> F{Provider allowed<br/>for this request?}:::auth
-
-    F -->|No| G[403 Forbidden<br/>Access denied to provider]:::deny
-    F -->|Yes| H[Proceed to<br/>Request Processing]:::process
-```
+1. Client sends request with Bearer token
+2. Extract API key from Authorization header
+3. Validate key exists in configuration
+4. Check if provider is allowed for this key
+5. Proceed with request processing or return error
 
 ## API Request Flow
 
-```mermaid
-flowchart TD
-    classDef client fill:#28a745,color:#fff,stroke:#fff,stroke-width:2px
-    classDef process fill:#dc3545,color:#fff,stroke:#fff,stroke-width:2px
-    classDef external fill:#007bff,color:#fff,stroke:#fff,stroke-width:2px
+Request processing pipeline:
 
-    A[Client Request<br/>POST /v1/chat/completions]:::client
-    A --> B[Authentication<br/>Bearer Token Validation]:::process
-    B --> C[Model Alias Resolution<br/>Map to provider:model]:::process
-    C --> D[Provider & Key Selection<br/>Load Balancing Algorithm]:::process
-    D --> E[Rate Limit Check<br/>Per-key limits]:::process
-    E --> F[External API Call<br/>OpenAI/Gemini/Claude]:::external
-    F --> G[Response Processing<br/>Token counting, caching]:::process
-    G --> H[Usage Tracking<br/>Metrics update]:::process
-    H --> I[Return OpenAI-compatible<br/>JSON Response]:::client
-
-    B --> J[401 Unauthorized]:::process
-    E --> K[429 Rate Limited]:::process
-    F --> L[Retry Logic<br/>Up to max_attempts]:::process
-    L --> F
-    L --> M[502/503 Error<br/>Provider failure]:::process
-```
+1. Client sends chat completion request
+2. Authentication via Bearer token
+3. Model alias resolution to provider:model
+4. Provider and key selection with load balancing
+5. Rate limit checking
+6. External API call to LLM provider
+7. Response processing with token counting
+8. Usage tracking and metrics update
+9. Return OpenAI-compatible JSON response
 
 ## OpenAI-Compatible Endpoints
 
-### POST /v1/chat/completions
+### POST /api/v1/chat/completions
 
 Generate chat completions using available models. This is the primary endpoint implemented in COO-LLM.
 
@@ -132,7 +110,48 @@ Generate chat completions using available models. This is the primary endpoint i
 - ✅ Usage tracking and cost calculation
 - ✅ Comprehensive logging
 
-### GET /v1/models
+### POST /api/v1/embeddings
+
+Generate embeddings for text inputs.
+
+**Request Body:**
+```json
+{
+  "model": "text-embedding-3-small",
+  "input": "Hello, world!",
+  "encoding_format": "float",
+  "dimensions": 1536,
+  "user": "user123"
+}
+```
+
+**Response:**
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "embedding": [0.1, 0.2, ...],
+      "index": 0
+    }
+  ],
+  "model": "text-embedding-3-small",
+  "usage": {
+    "prompt_tokens": 4,
+    "total_tokens": 4
+  }
+}
+```
+
+**Parameters:**
+- `model` (string, required): Embedding model to use
+- `input` (string/array, required): Text to embed
+- `encoding_format` (string, optional): "float" or "base64"
+- `dimensions` (integer, optional): Output dimensions
+- `user` (string, optional): User identifier
+
+### GET /api/v1/models
 
 List available models based on configured model aliases.
 
@@ -155,7 +174,6 @@ List available models based on configured model aliases.
     }
   ]
 }
-```
 
 **Note:** Models are listed based on `model_aliases` configuration, not actual provider models.
 
@@ -163,27 +181,28 @@ List available models based on configured model aliases.
 
 **Note:** Admin API endpoints are not yet implemented in the current version. The following are planned for future releases:
 
-### Planned Admin Endpoints
+### Admin Endpoints
 
-- `GET /admin/v1/config` - Get current configuration
-- `POST /admin/v1/config` - Update configuration
-- `POST /admin/v1/config/validate` - Validate configuration
-- `POST /admin/v1/reload` - Reload configuration from file
-- `GET /admin/v1/providers` - Get provider status and metrics
-- `GET /admin/v1/logs` - Get recent log entries
+- `GET /api/admin/v1/config` - Get current configuration (from store)
+- `POST /api/admin/v1/config` - Update configuration in store
+- `POST /api/admin/v1/config/validate` - Validate configuration
+- `GET /api/admin/v1/metrics` - Retrieve historical metrics data
+- `GET /api/admin/v1/clients` - Get aggregated statistics per client API key
+- `GET /api/admin/v1/stats` - Get aggregated statistics with flexible grouping
+- `POST /api/login` - Authenticate for Web UI access
 
-### Current Admin Access
+### Configuration Management
 
-Currently, configuration management is done via:
-- Configuration file reloading (restart required)
-- Direct file editing
-- Environment variable changes
+COO-LLM supports dynamic configuration management:
 
-Admin functionality will be added in future versions.
+- **Startup**: Loads base config from YAML, saves public config to store
+- **Runtime Sync**: Instances share public config from store, secrets from ENV
+- **Updates**: Admin can update config via API, synced across instances
+- **Security**: API keys stored as `\${ENV_VAR}`, resolved at runtime, never saved to store
 
 ## Metrics Endpoint
 
-### GET /metrics
+### GET /api/metrics
 
 Prometheus metrics endpoint (enabled when `logging.prometheus.enabled: true`).
 
@@ -192,11 +211,11 @@ Prometheus metrics endpoint (enabled when `logging.prometheus.enabled: true`).
 ```
 # HELP llm_requests_total Total number of LLM requests
 # TYPE llm_requests_total counter
-llm_requests_total{provider="openai",model="gpt-4"} 1250
+llm_requests_total\{provider="openai",model="gpt-4"\} 1250
 
 # HELP llm_request_duration_seconds Request duration in seconds
 # TYPE llm_request_duration_seconds histogram
-llm_request_duration_seconds_bucket{provider="openai",le="0.1"} 1200
+llm_request_duration_seconds_bucket\{provider="openai",le="0.1"\} 1200
 ...
 ```
 
@@ -214,6 +233,165 @@ logging:
     enabled: true
     endpoint: "/metrics"
 ```
+
+## Admin API
+
+Administrative endpoints for configuration and monitoring (require admin authentication):
+
+### Authentication
+```bash
+curl -H "Authorization: Bearer your-admin-key" http://localhost:2906/api/admin/v1/config
+```
+
+### Endpoints
+
+#### GET /api/admin/v1/config
+Get current configuration from store (sensitive data masked).
+
+**Response:**
+```json
+{
+  "version": "1.0",
+  "server": {
+    "listen": ":2906",
+    "admin_api_key": "****"
+  },
+  "llm_providers": [],
+  "api_keys": [
+    {
+      "id": "client-001",
+      "key": "sk-****",
+      "allowed_providers": ["openai"],
+      "description": "Production client"
+    }
+  ]
+}
+```
+
+#### POST /api/admin/v1/config
+Update configuration in store (only public fields).
+
+**Request Body:** Config JSON with public fields
+**Response:** `{"message": "Config updated successfully"}`
+
+#### POST /api/admin/v1/config/validate
+Validate configuration without applying.
+
+**Request Body:** Full config JSON
+**Response:** `{"message": "Config is valid"}` or error
+
+#### GET /api/admin/v1/metrics
+Retrieve historical metrics data.
+
+**Query Parameters:**
+- `name`: Metric name (`latency`, `tokens`, `cost`) - default: `latency`
+- `start`: Start timestamp (Unix seconds) - default: 1 hour ago
+- `end`: End timestamp (Unix seconds) - default: now
+
+**Response:**
+```json
+{
+  "name": "latency",
+  "start": 1700000000,
+  "end": 1700003600,
+  "points": [
+    {
+      "value": 150.5,
+      "timestamp": 1700000100
+    }
+  ]
+}
+```
+
+**Metrics Tags:** `provider`, `key`, `model`, `client_key`
+
+#### GET /api/admin/v1/clients
+Get aggregated statistics per client API key.
+
+**Query Parameters:**
+- `start`: Start timestamp (Unix seconds) - default: 24 hours ago
+- `end`: End timestamp (Unix seconds) - default: now
+
+**Response:**
+```json
+{
+  "start": 1700000000,
+  "end": 1700003600,
+  "client_stats": {
+    "test-12": {
+      "queries": 150,
+      "tokens": 25000,
+      "cost": 0.125
+    },
+    "gemini-only": {
+      "queries": 75,
+      "tokens": 15000,
+      "cost": 0.075
+    }
+  }
+}
+```
+
+#### GET /api/admin/v1/stats
+Get aggregated statistics with flexible grouping and filtering.
+
+**Query Parameters:**
+- `group_by`: Comma-separated list of dimensions to group by (e.g., `client_key,provider`) - default: `client_key`
+- `start`: Start timestamp (Unix seconds) - default: 24 hours ago
+- `end`: End timestamp (Unix seconds) - default: now
+- `client_key`: Filter by specific client key
+- `provider`: Filter by specific provider
+- `key`: Filter by specific provider key
+
+**Supported group_by dimensions:**
+- `client_key`: Group by client API key
+- `provider`: Group by provider ID
+- `key`: Group by provider key ID
+- `model`: Group by model name
+
+**Response:**
+```json
+{
+  "start": 1700000000,
+  "end": 1700003600,
+  "group_by": ["client_key", "provider"],
+  "filters": {"client_key": "test-12"},
+  "stats": {
+    "test-12": {
+      "openai": {
+        "queries": 100,
+        "tokens": 15000,
+        "cost": 0.075
+      },
+      "gemini": {
+        "queries": 50,
+        "tokens": 10000,
+        "cost": 0.050
+      }
+    }
+  }
+}
+```
+
+#### POST /api/login
+Authenticate for Web UI access.
+
+**Request:**
+```json
+{
+  "admin_id": "admin",
+  "password": "password"
+}
+```
+
+**Response:**
+```json
+{
+  "token": "webui-admin-1700000000"
+}
+```
+
+**Note:** Login endpoint is at `/api/login` for Web UI authentication.
 
 ## Error Responses
 
@@ -255,7 +433,7 @@ Rate limited requests return `429` status with retry information.
 Streaming responses are supported for chat completions:
 
 ```bash
-curl -X POST http://localhost:2906/v1/chat/completions \
+curl -X POST http://localhost:2906/api/v1/chat/completions \
   -H "Authorization: Bearer your-key" \
   -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "Tell me a story"}], "stream": true}'
 ```
@@ -272,7 +450,7 @@ import openai
 # Point to COO-LLM instead of OpenAI
 client = openai.OpenAI(
     api_key="dummy-key",  # COO-LLM ignores this, uses config-based auth
-    base_url="http://localhost:2906/v1"
+    base_url="http://localhost:2906/api/v1"
 )
 
 response = client.chat.completions.create(
@@ -287,7 +465,7 @@ print(response.choices[0].message.content)
 
 ```bash
 # Chat completion with API key auth
-curl -X POST http://localhost:2906/v1/chat/completions \
+curl -X POST http://localhost:2906/api/v1/chat/completions \
   -H "Authorization: Bearer test-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -296,7 +474,7 @@ curl -X POST http://localhost:2906/v1/chat/completions \
   }'
 
 # List available models
-curl http://localhost:2906/v1/models \
+curl http://localhost:2906/api/v1/models \
   -H "Authorization: Bearer test-key"
 
 # Prometheus metrics

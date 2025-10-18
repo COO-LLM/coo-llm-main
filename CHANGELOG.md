@@ -5,6 +5,49 @@ All notable changes to COO-LLM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.28] - 2025-10-18
+
+### Added
+- **CORS Support**: Full Cross-Origin Resource Sharing configuration for web applications
+- **API Key IDs**: Added optional unique identifiers for API keys for better management and UI display
+- **Enhanced Storage Layer**: Improved storage interfaces and provider implementations
+- **Configuration Enhancements**: Extended configuration schema with new validation rules
+- **Web UI Improvements**: Updated admin interface with better user experience
+
+### Changed
+- **Storage Architecture**: Refactored storage layer for better performance and reliability
+- **Configuration Structure**: Enhanced config validation and environment variable handling
+- **Admin Interface**: Improved web UI responsiveness and functionality
+
+### Fixed
+- **CORS Middleware**: Fixed middleware execution order and preflight request handling
+- **Configuration Loading**: Resolved YAML parsing issues and validation errors
+- **Storage Operations**: Fixed concurrent access issues in storage providers
+
+### Security
+- **CORS Security**: Added proper CORS headers and origin validation
+- **Configuration Security**: Enhanced secure handling of sensitive configuration data
+
+## [1.2.0] - 2025-10-17
+
+### Added
+- **xAI Grok Provider**: Full integration with xAI's Grok models with OpenAI-compatible API
+- **Streaming Responses**: Real-time streaming support for chat completions with Server-Sent Events
+- **Semantic Caching**: Configurable semantic similarity-based caching with embedding support
+- **Advanced Rate Limiting**: Per-user identification, burst handling (10% overage), and dynamic adjustments
+- **User Field Support**: Added `user` parameter in requests for per-user tracking
+
+### Changed
+- **Provider Interface**: Added `GenerateStream` method for streaming support
+- **Rate Limiting Logic**: Enhanced with burst allowance in `isRateLimited`
+- **Cache Configuration**: Added semantic caching options (embedding_model, similarity_threshold)
+- **Multi-Provider Support**: Now includes xAI Grok alongside OpenAI, Gemini, and Claude
+
+### Fixed
+- **Mutex Deadlock**: Fixed deadlock in `NextAPIKey` by moving `InitUsages` outside lock
+- **Go Vet Issues**: Fixed mutex copying and unkeyed struct literals
+- **Docusaurus Build**: Removed inline style causing React JSX error
+
 ## [1.1.1] - 2025-10-17
 
 ### Added

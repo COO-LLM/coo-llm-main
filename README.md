@@ -13,7 +13,7 @@ COO-LLM is a high-performance reverse proxy that intelligently distributes reque
 
 ### ✨ Core Capabilities
 - **🔄 Full OpenAI API Compatibility**: Drop-in replacement with identical request/response formats
-- **🌐 Multi-Provider Support**: OpenAI, Google Gemini, Anthropic Claude, and custom providers
+- **🌐 Multi-Provider Support**: OpenAI, Google Gemini, Anthropic Claude, Together AI, OpenRouter, Mistral AI, Cohere, Hugging Face, Replicate, Voyage AI, Fireworks AI, and custom providers
 - **🧠 Intelligent Load Balancing**: Advanced algorithms (Round Robin, Least Loaded, Hybrid) with real-time optimization
 - **💬 Conversation History**: Full support for multi-turn conversations and message history
 
@@ -25,9 +25,9 @@ COO-LLM is a high-performance reverse proxy that intelligently distributes reque
 
 ### 🏢 Enterprise-Ready
 - **🔌 Extensible Architecture**: Plugin system for custom providers, storage backends, and logging
-- **📊 Production Observability**: Prometheus metrics, structured logging, and health checks
-- **⚙️ Configuration Management**: YAML-based configuration with environment variable support
-- **🔒 Security**: API key masking, secure storage, and authentication controls
+- **📊 Production Observability**: Prometheus metrics, structured logging, admin API for metrics, and health checks
+- **⚙️ Configuration Management**: YAML-based configuration with environment variable support and runtime updates
+- **🔒 Security**: API key masking, secure storage, environment variable isolation, and authentication controls
 
 ## 🏁 Quick Start
 
@@ -46,12 +46,24 @@ export GEMINI_API_KEY="your-gemini-key"
 # Create config file
 cat > configs/config.yaml << EOF
 version: "1.0"
+
 server:
   listen: ":2906"
   admin_api_key: "admin-secret"
+  webui:
+    enabled: true
+    admin_id: "admin"
+    admin_password: "password"
+
+# Build Web UI
+cd webui && npm install && npm run build
+
+# Copy build to bin directory (optional, for deployment)
+cp -r webui/build bin/
 
 llm_providers:
-  - type: "openai"
+  - id: "openai"
+    type: "openai"
     api_keys: ["\${OPENAI_API_KEY}"]
     base_url: "https://api.openai.com"
     model: "gpt-4o"
@@ -62,7 +74,8 @@ llm_providers:
       req_per_min: 200
       tokens_per_min: 100000
 
-  - type: "gemini"
+  - id: "gemini"
+    type: "gemini"
     api_keys: ["\${GEMINI_API_KEY}"]
     base_url: "https://generativelanguage.googleapis.com"
     model: "gemini-1.5-pro"
@@ -73,16 +86,31 @@ llm_providers:
       req_per_min: 150
       tokens_per_min: 80000
 
-model_aliases:
-  gpt-4o: openai:gpt-4o
-  gemini-pro: gemini:gemini-1.5-pro
+  - id: "together"
+    type: "together"
+    api_keys: ["\${TOGETHER_API_KEY}"]
+    model: "meta-llama/Llama-2-70b-chat-hf"
+    pricing:
+      input_token_cost: 0.0000002
+      output_token_cost: 0.0000002
+    limits:
+      req_per_min: 100
+      tokens_per_min: 100000
+
+api_keys:
+  - key: "test-key"
+    allowed_providers: ["*"]
+    description: "Test API key"
 
 policy:
-  strategy: "hybrid"
+  algorithm: "hybrid"
   priority: "balanced"
   retry:
     max_attempts: 3
     timeout: "30s"
+  fallback:
+    enabled: true        # Enable fallback to other providers on failure
+    max_providers: 2     # Max fallback providers to try
   cache:
     enabled: true
     ttl_seconds: 10
@@ -92,21 +120,80 @@ EOF
 ./bin/coo-llm
 
 # Test simple request
-curl -X POST http://localhost:2906/v1/chat/completions \
+curl -X POST http://localhost:2906/api/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello!"}]}'
+  -d '{"model": "openai:gpt-4o", "messages": [{"role": "user", "content": "Hello!"}]}'
+
+# Test with different provider
+curl -X POST http://localhost:2906/api/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "together:meta-llama/Llama-2-70b-chat-hf", "messages": [{"role": "user", "content": "Hello!"}]}'
 
 # Test conversation history
-curl -X POST http://localhost:2906/v1/chat/completions \
+curl -X POST http://localhost:2906/api/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gemini:gemini-1.5-pro",
     "messages": [
       {"role": "user", "content": "What is the capital of France?"},
       {"role": "assistant", "content": "The capital of France is Paris."},
       {"role": "user", "content": "What about the population?"}
     ]
   }'
+```
+
+## 📋 Model Format
+
+COO-LLM uses a `provider_id:model_name` format for model specification:
+
+```
+provider_id:model_name
+```
+
+**Examples:**
+- `openai:gpt-4o` - GPT-4o from OpenAI
+- `gemini:gemini-1.5-pro` - Gemini 1.5 Pro from Google
+- `together:meta-llama/Llama-2-70b-chat-hf` - Llama 2 from Together AI
+- `fireworks:accounts/fireworks/models/llama-v3-8b-instruct` - Llama 3 from Fireworks AI
+
+**Provider IDs** correspond to the `id` field in your `llm_providers` configuration.
+
+## ⚙️ Configuration Management
+
+COO-LLM supports secure configuration management with environment variable isolation:
+
+### Security Features
+- **Environment Variable Isolation**: API keys and sensitive data are stored only in environment variables
+- **Config Sanitization**: When saving config files, sensitive data is replaced with `${VAR_NAME}` placeholders
+- **Runtime Resolution**: Environment variables are resolved at runtime, not persisted in config files
+
+### Config Persistence
+```bash
+# Save current config (with sensitive data sanitized)
+curl -X PUT http://localhost:2906/api/admin/v1/config \
+  -H "Authorization: Bearer your-admin-key" \
+  -d '{"server": {"listen": ":8080"}}' \
+  ?save_path=configs/my-config.yaml
+```
+
+### Example Config File (Sanitized)
+```yaml
+llm_providers:
+  - id: "openai"
+    type: "openai"
+    api_keys: ["${OPENAI_API_KEY}"]  # Resolved at runtime
+    model: "gpt-4o"
+
+api_keys:
+  - key: "${API_KEY_0}"  # Resolved at runtime
+    allowed_providers: ["*"]
+```
+
+### Environment Variables
+```bash
+export OPENAI_API_KEY="sk-your-key"
+export API_KEY_0="your-client-key"
+export COO__ADMIN_API_KEY="admin-secret"
 ```
 
 ### Docker
@@ -410,7 +497,7 @@ api_keys:
 
 **Usage**: Include the API key in the `Authorization` header:
 ```bash
-curl -X POST http://localhost:2906/v1/chat/completions \
+curl -X POST http://localhost:2906/api/v1/chat/completions \
   -H "Authorization: Bearer your-secure-api-key-1" \
   -H "Content-Type: application/json" \
   -d '{
@@ -440,7 +527,7 @@ server:
 **Access admin endpoints**:
 ```bash
 curl -H "Authorization: Bearer your-admin-secret" \
-  http://localhost:2906/admin/v1/config
+  http://localhost:2906/api/admin/v1/config
 ```
 
 ### Production Deployment

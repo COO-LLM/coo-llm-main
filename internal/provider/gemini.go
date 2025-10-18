@@ -133,6 +133,102 @@ func (p *GeminiProvider) Generate(ctx context.Context, req *LLMRequest) (*LLMRes
 	return nil, fmt.Errorf("unexpected error in retry loop")
 }
 
+func (p *GeminiProvider) GenerateStream(ctx context.Context, req *LLMRequest) (<-chan *LLMStreamResponse, error) {
+	// For now, return non-streaming response as single chunk
+	streamChan := make(chan *LLMStreamResponse, 1)
+
+	go func() {
+		defer close(streamChan)
+		resp, err := p.Generate(ctx, req)
+		if err != nil {
+			streamChan <- &LLMStreamResponse{Text: fmt.Sprintf("Error: %v", err), Done: true}
+			return
+		}
+		streamChan <- &LLMStreamResponse{Text: resp.Text, FinishReason: resp.FinishReason, Done: true}
+	}()
+
+	return streamChan, nil
+}
+
+func (p *GeminiProvider) CreateEmbeddings(ctx context.Context, req *EmbeddingsRequest) (*EmbeddingsResponse, error) {
+	// Retry with different keys if fail (max 3 attempts)
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Select least loaded key for first attempt, then rotate on retry
+		var currentKey string
+		if attempt == 0 {
+			currentKey = p.cfg.SelectLeastLoadedKey()
+		} else {
+			currentKey = p.cfg.NextAPIKey()
+		}
+		if currentKey == "" {
+			return nil, fmt.Errorf("no API key available")
+		}
+
+		client, err := genai.NewClient(ctx, option.WithAPIKey(currentKey))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Gemini client: %w", err)
+		}
+		defer client.Close()
+
+		modelName := p.cfg.Model
+		if req.Model != "" {
+			modelName = req.Model
+		}
+
+		// Get embedding model
+		embeddingModel := client.EmbeddingModel(modelName)
+
+		// Process each input text
+		embeddings := make([]Embedding, len(req.Input))
+		totalTokens := 0
+
+		for i, input := range req.Input {
+			// Call Gemini embedding API
+			resp, err := embeddingModel.EmbedContent(ctx, genai.Text(input))
+			if err != nil {
+				// If error and not last attempt, try next key
+				if attempt < maxRetries-1 {
+					p.cfg.NextAPIKey()
+					break
+				} else {
+					return nil, fmt.Errorf("Gemini embeddings API error after %d attempts: %w", maxRetries, err)
+				}
+			}
+
+			if resp.Embedding == nil {
+				return nil, fmt.Errorf("no embedding returned from Gemini")
+			}
+
+			// Convert []float32 to []float64
+			embedding := make([]float64, len(resp.Embedding.Values))
+			for j, val := range resp.Embedding.Values {
+				embedding[j] = float64(val)
+			}
+			embeddings[i] = Embedding(embedding)
+
+			// Estimate tokens (rough approximation)
+			totalTokens += len(input) / 4
+		}
+
+		// If we get here, all embeddings were successful
+		if len(embeddings) == len(req.Input) {
+			// Update usage
+			p.cfg.UpdateUsage(len(req.Input), totalTokens)
+
+			return &EmbeddingsResponse{
+				Embeddings: embeddings,
+				Usage: TokenUsage{
+					PromptTokens: totalTokens,
+					TotalTokens:  totalTokens,
+				},
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unexpected error in retry loop")
+}
+
 func (p *GeminiProvider) ListModels(ctx context.Context) ([]string, error) {
-	return []string{"gemini-1.5-pro", "gemini-1.5-flash"}, nil
+	return []string{"gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"}, nil
 }

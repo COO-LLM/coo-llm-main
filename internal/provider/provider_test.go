@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,6 +37,11 @@ func TestNewLLMProvider(t *testing.T) {
 	p, err = NewLLMProvider(&cfg)
 	require.NoError(t, err)
 	assert.Equal(t, "gemini", p.Name())
+
+	cfg.Type = ProviderGrok
+	p, err = NewLLMProvider(&cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "grok", p.Name())
 
 	cfg.Type = "unknown"
 	_, err = NewLLMProvider(&cfg)
@@ -76,6 +82,20 @@ func TestOpenAIProvider_ListModels(t *testing.T) {
 	assert.Contains(t, models, "gpt-4o")
 }
 
+func TestGrokProvider_Name(t *testing.T) {
+	cfg := LLMConfig{Type: ProviderGrok, APIKeys: []string{"test"}}
+	p := NewGrokProvider(&cfg)
+	assert.Equal(t, "grok", p.Name())
+}
+
+func TestGrokProvider_ListModels(t *testing.T) {
+	cfg := LLMConfig{Type: ProviderGrok, APIKeys: []string{"test"}}
+	p := NewGrokProvider(&cfg)
+	models, err := p.ListModels(context.Background())
+	require.NoError(t, err)
+	assert.Contains(t, models, "grok-beta")
+}
+
 func TestLLMConfig_APIKey(t *testing.T) {
 	cfg := LLMConfig{APIKeys: []string{"key1", "key2"}}
 	assert.Equal(t, "key1", cfg.APIKey())
@@ -87,6 +107,18 @@ func TestLLMConfig_NextAPIKey(t *testing.T) {
 	assert.Equal(t, "key2", cfg.NextAPIKey())
 	assert.Equal(t, "key3", cfg.NextAPIKey())
 	assert.Equal(t, "key1", cfg.NextAPIKey()) // Rotate back
+}
+
+func TestLLMConfig_NextAPIKeyWithEnv(t *testing.T) {
+	os.Setenv("TEST_KEY1", "resolved_key1")
+	os.Setenv("TEST_KEY2", "resolved_key2")
+	defer os.Unsetenv("TEST_KEY1")
+	defer os.Unsetenv("TEST_KEY2")
+
+	cfg := LLMConfig{APIKeys: []string{"${TEST_KEY1}", "${TEST_KEY2}"}}
+	assert.Equal(t, "resolved_key1", cfg.NextAPIKey())
+	assert.Equal(t, "resolved_key2", cfg.NextAPIKey())
+	assert.Equal(t, "resolved_key1", cfg.NextAPIKey()) // Rotate back
 }
 
 func TestLLMConfig_SelectLeastLoadedKey(t *testing.T) {
@@ -107,6 +139,23 @@ func TestLLMConfig_SelectLeastLoadedKey(t *testing.T) {
 
 	// key3 should be selected
 	assert.Equal(t, "key3", cfg.SelectLeastLoadedKey())
+}
+
+func TestLLMConfig_SelectLeastLoadedKeyWithEnv(t *testing.T) {
+	os.Setenv("TEST_KEY1", "resolved_key1")
+	os.Setenv("TEST_KEY2", "resolved_key2")
+	defer os.Unsetenv("TEST_KEY1")
+	defer os.Unsetenv("TEST_KEY2")
+
+	cfg := LLMConfig{APIKeys: []string{"${TEST_KEY1}", "${TEST_KEY2}"}}
+	cfg.InitUsages()
+
+	assert.Equal(t, "resolved_key1", cfg.SelectLeastLoadedKey())
+
+	// Update usage for first key to make second key selected
+	cfg.UpdateUsage(10, 1000)
+
+	assert.Equal(t, "resolved_key2", cfg.SelectLeastLoadedKey())
 }
 
 func TestLLMConfig_UpdateUsage(t *testing.T) {
@@ -131,6 +180,23 @@ type mockProvider struct {
 func (m *mockProvider) Name() string { return m.name }
 func (m *mockProvider) Generate(ctx context.Context, req *LLMRequest) (*LLMResponse, error) {
 	return &LLMResponse{Text: "ok", TokensUsed: 10, FinishReason: "stop"}, nil
+}
+func (m *mockProvider) GenerateStream(ctx context.Context, req *LLMRequest) (<-chan *LLMStreamResponse, error) {
+	streamChan := make(chan *LLMStreamResponse, 1)
+	go func() {
+		defer close(streamChan)
+		streamChan <- &LLMStreamResponse{Text: "ok", Done: true}
+	}()
+	return streamChan, nil
+}
+func (m *mockProvider) CreateEmbeddings(ctx context.Context, req *EmbeddingsRequest) (*EmbeddingsResponse, error) {
+	return &EmbeddingsResponse{
+		Embeddings: []Embedding{[]float64{0.1, 0.2, 0.3}},
+		Usage: TokenUsage{
+			PromptTokens: 5,
+			TotalTokens:  5,
+		},
+	}, nil
 }
 func (m *mockProvider) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"model1"}, nil

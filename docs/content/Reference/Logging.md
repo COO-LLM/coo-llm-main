@@ -27,18 +27,103 @@ Based on `internal/log/logger.go`, COO-LLM uses Zerolog for structured JSON logg
 
 Logs use JSON format with consistent fields:
 
+### Request Logs
+
 ```json
 {
   "level": "info",
-  "provider": "openai-prod",
-  "model": "gpt-4o",
-  "reqID": "1234567890",
-  "latencyMS": 1200,
-  "status": 200,
-  "tokens": 150,
-  "error": "",
-  "time": "2024-01-01T12:00:00Z"
+  "entry": {
+    "timestamp": "2025-10-18T10:10:37+07:00",
+    "provider": "gemini-prod",
+    "model": "gemini-prod:gemini-2.0-flash",
+    "req_id": "1760757037738488000",
+    "latency_ms": 460,
+    "status": 500,
+    "tokens": 0,
+    "cost": 0,
+    "error": "Gemini API error after 3 attempts: googleapi: Error 400: API key not valid..."
+  },
+  "time": "2025-10-18T10:10:37+07:00",
+  "message": "request"
 }
+```
+
+### Usage Logs
+
+```json
+{
+  "level": "debug",
+  "operation": "IncrementUsage",
+  "provider": "gemini-prod",
+  "keyID": "gemini-prod-9987861163793b2d",
+  "metric": "req",
+  "delta": 1,
+  "time": 1760756719,
+  "message": "store operation"
+}
+```
+
+### Fields Description
+
+- **level**: Log level (info, debug, error)
+- **entry**: Request details (for API calls)
+  - **timestamp**: ISO 8601 timestamp
+  - **provider**: Provider ID
+  - **model**: Model name
+  - **req_id**: Unique request ID
+  - **latency_ms**: Response time in milliseconds
+  - **status**: HTTP status code
+  - **tokens**: Token count (input + output)
+  - **cost**: Estimated cost
+  - **error**: Error message (if any)
+- **operation**: Store operation type
+- **provider/keyID**: Provider and key identifiers
+- **metric/delta**: Usage metric and change amount
+
+## Prometheus Metrics
+
+When enabled, COO-LLM exposes metrics at `/api/metrics` for monitoring:
+
+### Available Metrics
+
+- **llm_requests_total**: Total LLM requests by provider/model
+- **llm_request_duration_seconds**: Request duration histograms
+- **llm_tokens_total**: Token usage counters
+- **llm_cost_total**: Cost tracking
+- **llm_errors_total**: Error rate monitoring
+- **llm_active_connections**: Current active connections
+
+### Labels
+
+- `provider`: Provider ID (e.g., "openai", "gemini")
+- `model`: Model name (e.g., "gpt-4o", "gemini-1.5-pro")
+- `key`: Provider key ID
+- `client_key`: Client API key
+- `status`: HTTP status code
+
+### Configuration
+
+```yaml
+logging:
+  prometheus:
+    enabled: true
+    endpoint: "/api/metrics"
+```
+
+### Example Queries
+
+```promql
+# Request rate by provider
+rate(llm_requests_total[5m])
+
+# Error rate
+rate(llm_errors_total[5m]) / rate(llm_requests_total[5m])
+
+# Average latency
+histogram_quantile(0.95, rate(llm_request_duration_seconds_bucket[5m]))
+
+# Cost per hour
+increase(llm_cost_total[1h])
 ```
 
 ## Configuration
@@ -67,32 +152,7 @@ logging:
 
 ## Log Types
 
-### Request Logs
 
-Logged for each chat completion request via `logger.LogRequest()`:
-
-```json
-{
-  "level": "info",
-  "provider": "openai-prod",
-  "model": "gpt-4o",
-  "reqID": "1699123456789",
-  "latencyMS": 1200,
-  "status": 200,
-  "tokens": 150,
-  "error": "",
-  "time": "2024-01-01T12:00:00Z"
-}
-```
-
-**Fields:**
-- `provider`: Provider ID used for the request
-- `model`: Model name requested
-- `reqID`: Unique request identifier
-- `latencyMS`: Response time in milliseconds
-- `status`: HTTP status code
-- `tokens`: Total tokens used
-- `error`: Error message (if any)
 
 ### Application Logs
 

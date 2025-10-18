@@ -16,6 +16,7 @@ import (
 	"github.com/user/coo-llm/internal/config"
 	"github.com/user/coo-llm/internal/log"
 	"github.com/user/coo-llm/internal/provider"
+	"github.com/user/coo-llm/internal/store"
 )
 
 func TestModelsEndpoint(t *testing.T) {
@@ -58,6 +59,7 @@ func TestChatCompletionsEndpoint(t *testing.T) {
 		},
 		APIKeys: []config.APIKeyConfig{
 			{
+				ID:               "test-client",
 				Key:              "test-key",
 				AllowedProviders: []string{"*"},
 			},
@@ -71,12 +73,11 @@ func TestChatCompletionsEndpoint(t *testing.T) {
 	reg := provider.NewRegistry()
 	reg.Register(&mockProvider{})
 
-	runtimeStore := &mockStore{}
-	selector := balancer.NewSelector(cfg, runtimeStore)
 	logger := log.NewLogger(&config.Logging{})
-
+	runtimeStore := &mockStore{}
+	selector := balancer.NewSelector(cfg, runtimeStore, logger)
 	r := chi.NewRouter()
-	SetupRoutes(r, selector, logger, reg, cfg)
+	SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	reqBody := map[string]any{
 		"model": "gpt-4o",
@@ -95,7 +96,7 @@ func TestChatCompletionsEndpoint(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.Contains(t, resp, "choices")
@@ -112,6 +113,7 @@ func TestChatCompletionsEndpoint_InvalidModel(t *testing.T) {
 		},
 		APIKeys: []config.APIKeyConfig{
 			{
+				ID:               "test-client",
 				Key:              "test-key",
 				AllowedProviders: []string{"*"},
 			},
@@ -122,12 +124,11 @@ func TestChatCompletionsEndpoint_InvalidModel(t *testing.T) {
 	reg := provider.NewRegistry()
 	reg.Register(&mockProvider{})
 
-	runtimeStore := &mockStore{}
-	selector := balancer.NewSelector(cfg, runtimeStore)
 	logger := log.NewLogger(&config.Logging{})
-
+	runtimeStore := &mockStore{}
+	selector := balancer.NewSelector(cfg, runtimeStore, logger)
 	r := chi.NewRouter()
-	SetupRoutes(r, selector, logger, reg, cfg)
+	SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	reqBody := map[string]any{
 		"messages": []map[string]string{
@@ -160,11 +161,11 @@ func TestModelsEndpoint_EmptyConfig(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.Equal(t, "list", resp["object"])
-	data := resp["data"].([]interface{})
+	data := resp["data"].([]any)
 	assert.Len(t, data, 0)
 }
 
@@ -181,6 +182,7 @@ func TestChatCompletionsEndpoint_RetryOnFailure(t *testing.T) {
 		},
 		APIKeys: []config.APIKeyConfig{
 			{
+				ID:               "test-client",
 				Key:              "test-key",
 				AllowedProviders: []string{"*"},
 			},
@@ -199,14 +201,14 @@ func TestChatCompletionsEndpoint_RetryOnFailure(t *testing.T) {
 	}
 
 	reg := provider.NewRegistry()
-	reg.Register(&mockProviderWithRetry{})
+	reg.Register(&mockProvider{})
 
-	runtimeStore := &mockStore{}
-	selector := balancer.NewSelector(cfg, runtimeStore)
 	logger := log.NewLogger(&config.Logging{})
+	runtimeStore := &mockStore{}
+	selector := balancer.NewSelector(cfg, runtimeStore, logger)
 
 	r := chi.NewRouter()
-	SetupRoutes(r, selector, logger, reg, cfg)
+	SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	reqBody := map[string]any{
 		"model": "gpt-4o",
@@ -225,7 +227,7 @@ func TestChatCompletionsEndpoint_RetryOnFailure(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.Contains(t, resp, "choices")
@@ -244,6 +246,7 @@ func TestChatCompletionsEndpoint_Caching(t *testing.T) {
 		},
 		APIKeys: []config.APIKeyConfig{
 			{
+				ID:               "test-client",
 				Key:              "test-key",
 				AllowedProviders: []string{"*"},
 			},
@@ -264,12 +267,11 @@ func TestChatCompletionsEndpoint_Caching(t *testing.T) {
 	mockProv := &mockProvider{callCount: 0}
 	reg.Register(mockProv)
 
-	runtimeStore := &mockStoreWithCache{cache: make(map[string]string)}
-	selector := balancer.NewSelector(cfg, runtimeStore)
 	logger := log.NewLogger(&config.Logging{})
-
+	runtimeStore := &mockStoreWithCache{cache: make(map[string]string)}
+	selector := balancer.NewSelector(cfg, runtimeStore, logger)
 	r := chi.NewRouter()
-	SetupRoutes(r, selector, logger, reg, cfg)
+	SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	reqBody := map[string]any{
 		"model": "gpt-4o",
@@ -310,7 +312,7 @@ func TestChatCompletionsEndpoint_Caching(t *testing.T) {
 	assert.NotEmpty(t, cached)
 
 	// Verify second response has cache_hit flag
-	var resp2 map[string]interface{}
+	var resp2 map[string]any
 	err := json.Unmarshal(w2.Body.Bytes(), &resp2)
 	require.NoError(t, err)
 	assert.Equal(t, true, resp2["cache_hit"])
@@ -328,6 +330,7 @@ func TestChatCompletionsEndpoint_ConversationHistory(t *testing.T) {
 		},
 		APIKeys: []config.APIKeyConfig{
 			{
+				ID:               "test-client",
 				Key:              "test-key",
 				AllowedProviders: []string{"*"},
 			},
@@ -342,16 +345,16 @@ func TestChatCompletionsEndpoint_ConversationHistory(t *testing.T) {
 	mockProv := &mockProviderWithMessages{}
 	reg.Register(mockProv)
 
-	runtimeStore := &mockStore{}
-	selector := balancer.NewSelector(cfg, runtimeStore)
 	logger := log.NewLogger(&config.Logging{})
+	runtimeStore := &mockStore{}
+	selector := balancer.NewSelector(cfg, runtimeStore, logger)
 
 	r := chi.NewRouter()
-	SetupRoutes(r, selector, logger, reg, cfg)
+	SetupRoutes(r, selector, logger, reg, cfg, runtimeStore)
 
 	reqBody := map[string]any{
 		"model": "gpt-4o",
-		"messages": []map[string]interface{}{
+		"messages": []map[string]any{
 			{"role": "user", "content": "Hello, how are you?"},
 			{"role": "assistant", "content": "You are me"},
 			{"role": "user", "content": "Oh, my god"},
@@ -370,7 +373,7 @@ func TestChatCompletionsEndpoint_ConversationHistory(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 	assert.Contains(t, resp, "choices")
@@ -398,6 +401,23 @@ func (m *mockProvider) Generate(ctx context.Context, req *provider.LLMRequest) (
 		FinishReason: "stop",
 	}, nil
 }
+func (m *mockProvider) GenerateStream(ctx context.Context, req *provider.LLMRequest) (<-chan *provider.LLMStreamResponse, error) {
+	streamChan := make(chan *provider.LLMStreamResponse, 1)
+	go func() {
+		defer close(streamChan)
+		streamChan <- &provider.LLMStreamResponse{Text: "Hello back", Done: true}
+	}()
+	return streamChan, nil
+}
+func (m *mockProvider) CreateEmbeddings(ctx context.Context, req *provider.EmbeddingsRequest) (*provider.EmbeddingsResponse, error) {
+	return &provider.EmbeddingsResponse{
+		Embeddings: []provider.Embedding{[]float64{0.1, 0.2, 0.3}},
+		Usage: provider.TokenUsage{
+			PromptTokens: 5,
+			TotalTokens:  5,
+		},
+	}, nil
+}
 func (m *mockProvider) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"gpt-4o"}, nil
 }
@@ -412,6 +432,84 @@ func (m *mockStore) GetUsageInWindow(provider, keyID, metric string, windowSecon
 }
 func (m *mockStore) SetCache(key, value string, ttlSeconds int64) error { return nil }
 func (m *mockStore) GetCache(key string) (string, error)                { return "", nil }
+func (m *mockStore) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	return nil
+}
+func (m *mockStore) GetMetrics(name string, tags map[string]string, start, end int64) ([]store.MetricPoint, error) {
+	return []store.MetricPoint{}, nil
+}
+
+func (m *mockStore) LoadConfig() (*config.Config, error) {
+	return &config.Config{Policy: config.Policy{Algorithm: "round_robin"}}, nil
+}
+
+func (m *mockStore) SaveConfig(cfg *config.Config) error {
+	return nil
+}
+
+func (m *mockStore) CreateClient(clientID, apiKey, description string, allowedProviders []string) error {
+	return nil
+}
+
+func (m *mockStore) UpdateClient(clientID, description string, allowedProviders []string) error {
+	return nil
+}
+
+func (m *mockStore) DeleteClient(clientID string) error {
+	return nil
+}
+
+func (m *mockStore) GetClient(clientID string) (*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStore) ListClients() ([]*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStore) ValidateClient(apiKey string) (*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetClientMetrics(clientID string, start, end int64) (*store.ClientMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetProviderMetrics(providerID string, start, end int64) (*store.ProviderMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetKeyMetrics(providerID, keyID string, start, end int64) (*store.KeyMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetGlobalMetrics(start, end int64) (*store.GlobalMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetClientTimeSeries(clientID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetProviderTimeSeries(providerID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetKeyTimeSeries(providerID, keyID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStore) SaveAlgorithmConfig(algorithm string, config map[string]interface{}) error {
+	return nil
+}
+
+func (m *mockStore) LoadAlgorithmConfig(algorithm string) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (m *mockStore) ListAlgorithms() ([]string, error) {
+	return []string{"round_robin", "least_loaded", "hybrid"}, nil
+}
 
 type mockProviderWithRetry struct {
 	callCount int
@@ -429,6 +527,23 @@ func (m *mockProviderWithRetry) Generate(ctx context.Context, req *provider.LLMR
 		InputTokens:  5,
 		OutputTokens: 5,
 		FinishReason: "stop",
+	}, nil
+}
+func (m *mockProviderWithRetry) GenerateStream(ctx context.Context, req *provider.LLMRequest) (<-chan *provider.LLMStreamResponse, error) {
+	streamChan := make(chan *provider.LLMStreamResponse, 1)
+	go func() {
+		defer close(streamChan)
+		streamChan <- &provider.LLMStreamResponse{Text: "Hello back after retry", Done: true}
+	}()
+	return streamChan, nil
+}
+func (m *mockProviderWithRetry) CreateEmbeddings(ctx context.Context, req *provider.EmbeddingsRequest) (*provider.EmbeddingsResponse, error) {
+	return &provider.EmbeddingsResponse{
+		Embeddings: []provider.Embedding{[]float64{0.1, 0.2, 0.3}},
+		Usage: provider.TokenUsage{
+			PromptTokens: 5,
+			TotalTokens:  5,
+		},
 	}, nil
 }
 func (m *mockProviderWithRetry) ListModels(ctx context.Context) ([]string, error) {
@@ -459,10 +574,88 @@ func (m *mockStoreWithCache) GetCache(key string) (string, error) {
 	}
 	return "", nil
 }
+func (m *mockStoreWithCache) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	return nil
+}
+func (m *mockStoreWithCache) GetMetrics(name string, tags map[string]string, start, end int64) ([]store.MetricPoint, error) {
+	return []store.MetricPoint{}, nil
+}
+
+func (m *mockStoreWithCache) LoadConfig() (*config.Config, error) {
+	return &config.Config{Policy: config.Policy{Algorithm: "round_robin"}}, nil
+}
+
+func (m *mockStoreWithCache) SaveConfig(cfg *config.Config) error {
+	return nil
+}
+
+func (m *mockStoreWithCache) CreateClient(clientID, apiKey, description string, allowedProviders []string) error {
+	return nil
+}
+
+func (m *mockStoreWithCache) UpdateClient(clientID, description string, allowedProviders []string) error {
+	return nil
+}
+
+func (m *mockStoreWithCache) DeleteClient(clientID string) error {
+	return nil
+}
+
+func (m *mockStoreWithCache) GetClient(clientID string) (*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) ListClients() ([]*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) ValidateClient(apiKey string) (*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) GetClientMetrics(clientID string, start, end int64) (*store.ClientMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) GetProviderMetrics(providerID string, start, end int64) (*store.ProviderMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) GetKeyMetrics(providerID, keyID string, start, end int64) (*store.KeyMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) GetGlobalMetrics(start, end int64) (*store.GlobalMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) GetClientTimeSeries(clientID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) GetProviderTimeSeries(providerID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) GetKeyTimeSeries(providerID, keyID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) SaveAlgorithmConfig(algorithm string, config map[string]interface{}) error {
+	return nil
+}
+
+func (m *mockStoreWithCache) LoadAlgorithmConfig(algorithm string) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (m *mockStoreWithCache) ListAlgorithms() ([]string, error) {
+	return []string{"round_robin", "least_loaded", "hybrid"}, nil
+}
 
 type mockProviderWithMessages struct {
 	receivedMessages bool
-	messages         []map[string]interface{}
+	messages         []map[string]any
 }
 
 func (m *mockProviderWithMessages) Name() string { return "openai-prod" }
@@ -475,6 +668,23 @@ func (m *mockProviderWithMessages) Generate(ctx context.Context, req *provider.L
 		InputTokens:  10,
 		OutputTokens: 5,
 		FinishReason: "stop",
+	}, nil
+}
+func (m *mockProviderWithMessages) GenerateStream(ctx context.Context, req *provider.LLMRequest) (<-chan *provider.LLMStreamResponse, error) {
+	streamChan := make(chan *provider.LLMStreamResponse, 1)
+	go func() {
+		defer close(streamChan)
+		streamChan <- &provider.LLMStreamResponse{Text: "Response to conversation", Done: true}
+	}()
+	return streamChan, nil
+}
+func (m *mockProviderWithMessages) CreateEmbeddings(ctx context.Context, req *provider.EmbeddingsRequest) (*provider.EmbeddingsResponse, error) {
+	return &provider.EmbeddingsResponse{
+		Embeddings: []provider.Embedding{[]float64{0.1, 0.2, 0.3}},
+		Usage: provider.TokenUsage{
+			PromptTokens: 5,
+			TotalTokens:  5,
+		},
 	}, nil
 }
 func (m *mockProviderWithMessages) ListModels(ctx context.Context) ([]string, error) {

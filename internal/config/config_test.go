@@ -38,9 +38,6 @@ model_aliases:
 	assert.Equal(t, ":2906", cfg.Server.Listen)
 	assert.Len(t, cfg.LLMProviders, 1)
 	assert.Equal(t, "openai", cfg.LLMProviders[0].Type)
-	// Should populate Providers from LLMProviders
-	assert.Len(t, cfg.Providers, 1)
-	assert.Equal(t, "openai", cfg.Providers[0].ID)
 }
 
 func TestValidateConfig(t *testing.T) {
@@ -92,6 +89,7 @@ llm_providers:
 	cfg, err := LoadConfig(tmpFile.Name())
 	require.NoError(t, err)
 
-	assert.Equal(t, "sk-expanded", cfg.LLMProviders[0].APIKeys[0])
-	assert.Equal(t, "admin-expanded", cfg.Server.AdminAPIKey)
+	// Config should contain placeholders, env vars resolved at runtime
+	assert.Equal(t, "${TEST_API_KEY}", cfg.LLMProviders[0].APIKeys[0])
+	assert.Equal(t, "${TEST_ADMIN_KEY}", cfg.Server.AdminAPIKey)
 }

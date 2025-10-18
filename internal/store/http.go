@@ -115,6 +115,16 @@ func (h *HTTPStore) GetCache(key string) (string, error) {
 	return "", nil
 }
 
+func (h *HTTPStore) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
+	// TODO: implement HTTP metric storage
+	return nil
+}
+
+func (h *HTTPStore) GetMetrics(name string, tags map[string]string, start, end int64) ([]MetricPoint, error) {
+	// TODO: implement HTTP metric query
+	return []MetricPoint{}, nil
+}
+
 func (h *HTTPStore) LoadConfig() (*config.Config, error) {
 	url := fmt.Sprintf("%s/config", h.endpoint)
 	req, err := http.NewRequest("GET", url, nil)

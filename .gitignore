@@ -212,3 +212,5 @@ dump.rdb
 
 # Prometheus data
 data/
+
+run.sh

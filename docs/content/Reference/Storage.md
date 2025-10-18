@@ -5,11 +5,15 @@ tags: [developer-guide, storage]
 
 # Storage
 
-COO-LLM uses pluggable storage backends for runtime metrics and caching. The system supports Redis, in-memory, HTTP API, file-based, SQL databases, MongoDB, and DynamoDB storage.
+COO-LLM uses pluggable storage backends for runtime metrics and caching. The system supports Redis, HTTP API, SQL databases (SQLite/PostgreSQL), MongoDB, DynamoDB, and InfluxDB storage.
 
-## Storage Interface
+## Storage Interfaces
 
-All storage backends implement the `RuntimeStore` interface from `internal/store/interface.go`:
+COO-LLM uses multiple storage interfaces for different purposes:
+
+### RuntimeStore
+
+For metrics, caching, and usage tracking:
 
 ```go
 type RuntimeStore interface {
@@ -19,41 +23,171 @@ type RuntimeStore interface {
     GetUsageInWindow(provider, keyID, metric string, windowSeconds int64) (float64, error)
     SetCache(key, value string, ttlSeconds int64) error
     GetCache(key string) (string, error)
+    StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error
+    GetMetrics(name string, tags map[string]string, start, end int64) ([]MetricPoint, error)
 }
 ```
 
+### ConfigStore
+
+For configuration management and persistence:
+
+```go
+type ConfigStore interface {
+    LoadConfig() (*config.Config, error)
+    SaveConfig(cfg *config.Config) error
+}
+```
+
+**Features:**
+- Stores public configuration for instance synchronization
+- Masks sensitive data (API keys, secrets)
+- Supports dynamic config updates via admin API
+- Fallback to in-memory if store unavailable
+
+### ClientStore
+
+For client API key management and validation:
+
+```go
+type ClientStore interface {
+    CreateClient(clientID, apiKey, description string, allowedProviders []string) error
+    UpdateClient(clientID, description string, allowedProviders []string) error
+    DeleteClient(clientID string) error
+    GetClient(clientID string) (*ClientInfo, error)
+    ListClients() ([]*ClientInfo, error)
+    ValidateClient(apiKey string) (*ClientInfo, error)
+}
+```
+
+### MetricsStore
+
+For advanced metrics queries and time-series data:
+
+```go
+type MetricsStore interface {
+    GetClientMetrics(clientID string, start, end int64) (*ClientMetrics, error)
+    GetProviderMetrics(providerID string, start, end int64) (*ProviderMetrics, error)
+    GetKeyMetrics(providerID, keyID string, start, end int64) (*KeyMetrics, error)
+    GetGlobalMetrics(start, end int64) (*GlobalMetrics, error)
+    GetClientTimeSeries(clientID string, start, end int64, interval string) ([]TimeSeriesPoint, error)
+    GetProviderTimeSeries(providerID string, start, end int64, interval string) ([]TimeSeriesPoint, error)
+    GetKeyTimeSeries(providerID, keyID string, start, end int64, interval string) ([]TimeSeriesPoint, error)
+}
+```
+
+### AlgorithmStore
+
+For storing algorithm configurations:
+
+```go
+type AlgorithmStore interface {
+    SaveAlgorithmConfig(algorithm string, config map[string]interface{}) error
+    LoadAlgorithmConfig(algorithm string) (map[string]interface{}, error)
+    ListAlgorithms() ([]string, error)
+}
+```
+
+### StoreProvider
+
+Unified interface combining all storage capabilities:
+
+```go
+type StoreProvider interface {
+    RuntimeStore
+    ConfigStore
+    ClientStore
+    MetricsStore
+    AlgorithmStore
+}
+```
+
+## Configuration Storage
+
+Public configuration is stored separately from runtime data:
+
+- **Startup**: Loads base config from YAML, saves masked public config to store
+- **Updates**: Admin API updates config in store, synced across instances
+- **Security**: API keys stored as `${ENV_VAR}`, resolved at runtime, never persisted
+
 ## Supported Backends
 
-### SQL Database Storage (PostgreSQL)
+See individual backend documentation:
+
+- Redis - High-performance in-memory storage
+- MongoDB - Document-based NoSQL database
+- DynamoDB - AWS serverless NoSQL database
+- InfluxDB - Time-series database for metrics
+- HTTP API - REST API-based storage
+- File-based - Simple JSON file storage
+- In-Memory - Volatile storage for development
+- SQL Database - Full-featured SQL database storage
 
 **Configuration:**
 ```yaml
 storage:
   runtime:
     type: "sql"
-    addr: "postgresql://user:password@localhost/dbname?sslmode=disable"
+    addr: "./data/coo-llm.db"  # SQLite (default)
+    # addr: "postgresql://user:password@localhost/dbname?sslmode=disable"  # PostgreSQL
 ```
 
 **Features:**
-- Full SQL database support with PostgreSQL
+- Full SQL database support with SQLite (default) and PostgreSQL
 - Persistent storage with ACID transactions
 - Advanced querying capabilities
 - Time-window analytics support
 - Automatic table creation and indexing
 
 **Data Structure:**
+
+*SQLite:*
 ```sql
 -- Usage metrics table
 CREATE TABLE usage_metrics (
-    provider VARCHAR(50) NOT NULL,
-    key_id VARCHAR(100) NOT NULL,
-    metric VARCHAR(50) NOT NULL,
-    value DOUBLE PRECISION NOT NULL,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL,
+    key_id TEXT NOT NULL,
+    metric TEXT NOT NULL,
+    value REAL NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(provider, key_id, metric)
 );
 
 -- Usage history table for time-window queries
 CREATE TABLE usage_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL,
+    key_id TEXT NOT NULL,
+    metric TEXT NOT NULL,
+    delta REAL NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Cache table
+CREATE TABLE cache (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    expiry DATETIME
+);
+```
+
+*PostgreSQL:*
+```sql
+-- Usage metrics table
+CREATE TABLE usage_metrics (
+    id SERIAL PRIMARY KEY,
+    provider VARCHAR(50) NOT NULL,
+    key_id VARCHAR(100) NOT NULL,
+    metric VARCHAR(50) NOT NULL,
+    value DOUBLE PRECISION NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(provider, key_id, metric)
+);
+
+-- Usage history table for time-window queries
+CREATE TABLE usage_history (
+    id SERIAL PRIMARY KEY,
     provider VARCHAR(50) NOT NULL,
     key_id VARCHAR(100) NOT NULL,
     metric VARCHAR(50) NOT NULL,
@@ -154,6 +288,44 @@ SK: DATA
 Attributes: value (String), expiry (Number)
 ```
 
+### InfluxDB Storage (Time-Series)
+
+**Configuration:**
+```yaml
+storage:
+  runtime:
+    type: "influxdb"
+    addr: "http://localhost:8086"
+    password: "${INFLUX_TOKEN}"
+    api_key: "${INFLUX_ORG}"
+    database: "${INFLUX_BUCKET}"
+```
+
+**Features:**
+- Time-series database optimized for metrics
+- High-performance time-window queries
+- Automatic data retention policies
+- Real-time analytics and alerting
+- Horizontal scaling capabilities
+
+**Data Structure:**
+```
+Measurement: usage
+Tags: provider, keyID, metric
+Fields: value (float)
+Time: timestamp
+
+Measurement: usage_history
+Tags: provider, keyID, metric
+Fields: delta (float)
+Time: timestamp
+
+Measurement: cache
+Tags: key
+Fields: value (string), expiry (timestamp)
+Time: timestamp
+```
+
 ### Redis Storage (Production)
 
 **Configuration:**
@@ -183,20 +355,6 @@ usage:openai:key1:tokens → 1200.0
 usage:openai:key1:errors → 2.0
 ```
 
-### In-Memory Storage (Development)
-
-**Configuration:**
-```yaml
-storage:
-  runtime:
-    type: "memory"
-```
-
-**Features:**
-- Fast in-memory storage
-- No persistence (lost on restart)
-- Used for development and testing
-
 ### HTTP API Storage
 
 **Configuration:**
@@ -219,12 +377,26 @@ storage:
 storage:
   runtime:
     type: "file"
-    path: "./storage/data.json"
+    addr: "./storage/data.json"
 ```
 
 **Features:**
 - Simple file-based storage
 - Not recommended for production
+
+### In-Memory Storage
+
+**Configuration:**
+```yaml
+storage:
+  runtime:
+    type: "memory"
+```
+
+**Features:**
+- Volatile in-memory storage
+- Useful for development and testing
+- Does not persist data across restarts
 
 ## Usage Metrics
 
@@ -259,7 +431,7 @@ policy:
 ```yaml
 storage:
   runtime:
-    type: "redis"  # redis, memory, http, file, sql, mongodb, dynamodb
+    type: "redis"  # redis, http, sql, mongodb, dynamodb, influxdb
     addr: "localhost:6379"  # Connection string or endpoint
     password: ""            # Redis password
     api_key: ""             # HTTP API key
@@ -309,16 +481,6 @@ ERROR store operation failed operation=SetUsage provider=openai keyID=key1 metri
 - Automatic TTL management
 - Atomic increment operations
 - Connection pooling
-
-### Memory Backend
-
-**File:** `internal/store/memory.go`
-
-**Features:**
-- Thread-safe with sync.RWMutex
-- In-memory map storage
-- No persistence
-- Fast for development
 
 ### HTTP Backend
 
@@ -407,7 +569,7 @@ Metrics are used for:
 
 ### Development Setup
 
-- Use in-memory storage for quick testing
+- Use SQL storage (SQLite) for quick testing
 - Switch to Redis when testing load balancing
 - Check logs for storage errors
 
