@@ -80,7 +80,7 @@ func (r *Registry) LoadFromConfig(cfg *config.Config) error {
 				APIKeys: keys,
 				BaseURL: pCfg.BaseURL,
 				Model:   "gpt-4",
-				Pricing: pCfg.Keys[0].Pricing,
+				Pricing: pCfg.Pricing,
 				Limits: config.Limits{
 					ReqPerMin:    pCfg.Keys[0].LimitReqPerMin,
 					TokensPerMin: pCfg.Keys[0].LimitTokensPerMin,

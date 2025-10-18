@@ -11,7 +11,7 @@ test:
 	go test ./...
 
 lint:
-	golangci-lint run
+	golangci-lint run .
 
 clean:
 	rm -rf bin/

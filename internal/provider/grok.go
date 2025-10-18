@@ -121,6 +121,78 @@ func (p *GrokProvider) GenerateStream(ctx context.Context, req *LLMRequest) (<-c
 	return streamChan, nil
 }
 
+func (p *GrokProvider) CreateEmbeddings(ctx context.Context, req *EmbeddingsRequest) (*EmbeddingsResponse, error) {
+	// Grok uses OpenAI-compatible API, try embeddings endpoint
+	// Retry with different keys if fail (max 3 attempts)
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Select least loaded key for first attempt, then rotate on retry
+		var currentKey string
+		if attempt == 0 {
+			currentKey = p.cfg.SelectLeastLoadedKey()
+		} else {
+			currentKey = p.cfg.NextAPIKey()
+		}
+		if currentKey == "" {
+			return nil, fmt.Errorf("no API key available")
+		}
+
+		config := openai.DefaultConfig(currentKey)
+		config.BaseURL = "https://api.x.ai/v1"
+		p.client = openai.NewClientWithConfig(config)
+
+		modelName := p.cfg.Model
+		if req.Model != "" {
+			modelName = req.Model
+		}
+
+		embedReq := openai.EmbeddingRequest{
+			Input: req.Input,
+			Model: openai.EmbeddingModel(modelName),
+			User:  req.User,
+		}
+
+		resp, err := p.client.CreateEmbeddings(ctx, embedReq)
+		if err == nil && len(resp.Data) > 0 {
+			// Update usage - estimate tokens based on input length
+			totalTokens := 0
+			for _, input := range req.Input {
+				totalTokens += len(input) / 4 // Rough estimate
+			}
+			p.cfg.UpdateUsage(len(resp.Data), totalTokens)
+
+			embeddings := make([]Embedding, len(resp.Data))
+			for i, data := range resp.Data {
+				// Convert []float32 to []float64
+				embedding := make([]float64, len(data.Embedding))
+				for j, val := range data.Embedding {
+					embedding[j] = float64(val)
+				}
+				embeddings[i] = Embedding(embedding)
+			}
+
+			return &EmbeddingsResponse{
+				Embeddings: embeddings,
+				Usage: TokenUsage{
+					PromptTokens: totalTokens,
+					TotalTokens:  totalTokens,
+				},
+			}, nil
+		}
+
+		// If error and not last attempt, continue to next key
+		if attempt == maxRetries-1 {
+			// Last attempt failed
+			if err != nil {
+				return nil, fmt.Errorf("Grok embeddings API error after %d attempts: %w", maxRetries, err)
+			}
+			return nil, fmt.Errorf("no embeddings response from Grok after %d attempts", maxRetries)
+		}
+	}
+
+	return nil, fmt.Errorf("unexpected error in retry loop")
+}
+
 func (p *GrokProvider) ListModels(ctx context.Context) ([]string, error) {
 	// Grok typically supports grok-beta and similar models
 	return []string{"grok-beta"}, nil

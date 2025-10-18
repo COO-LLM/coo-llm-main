@@ -72,7 +72,7 @@ sidebar_position: 1
 Use relative links for internal documentation:
 
 ```markdown
-[Configuration](../guides/configuration.md)
+[Configuration](../Guides/Configuration.md)
 ```
 
 ### Code Blocks

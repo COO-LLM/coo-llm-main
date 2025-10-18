@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/user/coo-llm/internal/config"
+	"github.com/user/coo-llm/internal/log"
 	"github.com/user/coo-llm/internal/store"
 )
 
@@ -15,6 +16,90 @@ type mockStore struct {
 
 func newMockStore() *mockStore {
 	return &mockStore{data: make(map[string]map[string]map[string]float64)}
+}
+
+type mockStoreProvider struct {
+	*mockStore
+}
+
+func newMockStoreProvider() *mockStoreProvider {
+	return &mockStoreProvider{mockStore: newMockStore()}
+}
+
+func newTestLogger() *log.Logger {
+	return log.NewLogger(&config.Logging{})
+}
+
+func (m *mockStoreProvider) LoadConfig() (*config.Config, error) {
+	return &config.Config{Policy: config.Policy{Algorithm: "round_robin"}}, nil
+}
+
+func (m *mockStoreProvider) SaveConfig(cfg *config.Config) error {
+	return nil
+}
+
+func (m *mockStoreProvider) CreateClient(clientID, apiKey, description string, allowedProviders []string) error {
+	return nil
+}
+
+func (m *mockStoreProvider) UpdateClient(clientID, description string, allowedProviders []string) error {
+	return nil
+}
+
+func (m *mockStoreProvider) DeleteClient(clientID string) error {
+	return nil
+}
+
+func (m *mockStoreProvider) GetClient(clientID string) (*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) ListClients() ([]*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) ValidateClient(apiKey string) (*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) GetClientMetrics(clientID string, start, end int64) (*store.ClientMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) GetProviderMetrics(providerID string, start, end int64) (*store.ProviderMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) GetKeyMetrics(providerID, keyID string, start, end int64) (*store.KeyMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) GetGlobalMetrics(start, end int64) (*store.GlobalMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) GetClientTimeSeries(clientID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) GetProviderTimeSeries(providerID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) GetKeyTimeSeries(providerID, keyID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) SaveAlgorithmConfig(algorithm string, config map[string]interface{}) error {
+	return nil
+}
+
+func (m *mockStoreProvider) LoadAlgorithmConfig(algorithm string) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (m *mockStoreProvider) ListAlgorithms() ([]string, error) {
+	return []string{"round_robin", "least_loaded", "hybrid"}, nil
 }
 
 func (m *mockStore) GetUsage(provider, keyID, metric string) (float64, error) {
@@ -72,11 +157,11 @@ func TestRateLimiting(t *testing.T) {
 		Policy: config.Policy{Algorithm: "round_robin"},
 	}
 
-	store := newMockStore()
+	store := newMockStoreProvider()
 	// Set key1 as rate limited (exceeded req limit)
 	store.SetUsage("openai", "key1", "req", 15) // 15 > 10 limit
 
-	selector := NewSelector(cfg, store)
+	selector := NewSelector(cfg, store, newTestLogger())
 
 	// Should select key2 since key1 is rate limited
 	key, err := selector.selectKey(&cfg.Providers[0], "gpt-4o")
@@ -97,8 +182,9 @@ func TestResolveModel(t *testing.T) {
 			"gpt-4o": "openai:gpt-4o",
 		},
 	}
-	store := newMockStore()
-	selector := NewSelector(cfg, store)
+	store := newMockStoreProvider()
+
+	selector := NewSelector(cfg, store, newTestLogger())
 
 	providerID, modelName := selector.resolveModel("gpt-4o")
 	assert.Equal(t, "openai", providerID)
@@ -124,8 +210,8 @@ func TestSelectBest(t *testing.T) {
 		},
 		Policy: config.Policy{Algorithm: "round_robin"},
 	}
-	store := newMockStore()
-	selector := NewSelector(cfg, store)
+	store := newMockStoreProvider()
+	selector := NewSelector(cfg, store, newTestLogger())
 
 	pCfg, key, _, err := selector.SelectBest("gpt-4o")
 	require.NoError(t, err)
@@ -151,8 +237,8 @@ func TestSelectRoundRobin(t *testing.T) {
 		},
 		Policy: config.Policy{Algorithm: "round_robin"},
 	}
-	store := newMockStore()
-	selector := NewSelector(cfg, store)
+	store := newMockStoreProvider()
+	selector := NewSelector(cfg, store, newTestLogger())
 
 	key, err := selector.selectRoundRobin(&cfg.Providers[0])
 	require.NoError(t, err)
@@ -163,15 +249,18 @@ func TestSelectHybrid(t *testing.T) {
 	cfg := &config.Config{
 		Providers: []config.Provider{
 			{
-				ID: "openai",
+				ID:      "openai",
+				Pricing: config.Pricing{InputTokenCost: 0.01, OutputTokenCost: 0.02},
 				Keys: []config.Key{
 					{
-						ID:      "key1",
-						Pricing: config.Pricing{InputTokenCost: 0.01, OutputTokenCost: 0.02},
+						ID:           "key1",
+						SessionLimit: 10000,
+						SessionType:  "1h",
 					},
 					{
-						ID:      "key2",
-						Pricing: config.Pricing{InputTokenCost: 0.02, OutputTokenCost: 0.04},
+						ID:           "key2",
+						SessionLimit: 20000,
+						SessionType:  "1h",
 					},
 				},
 			},
@@ -187,12 +276,12 @@ func TestSelectHybrid(t *testing.T) {
 			},
 		},
 	}
-	store := newMockStore()
+	store := newMockStoreProvider()
 	store.SetUsage("openai", "key1", "req", 100)
 	store.SetUsage("openai", "key2", "req", 50)
-	selector := NewSelector(cfg, store)
+	selector := NewSelector(cfg, store, newTestLogger())
 
-	key, err := selector.selectHybrid(&cfg.Providers[0], "gpt-4o")
+	key, err := selector.selectHybrid(&cfg.Providers[0], "gpt-4o", cfg.Policy)
 	require.NoError(t, err)
 	assert.Equal(t, "key2", key.ID) // key2 has lower req usage
 }
@@ -209,26 +298,32 @@ func TestCalculateScore(t *testing.T) {
 			},
 		},
 	}
-	store := newMockStore()
+	store := newMockStoreProvider()
 	store.SetUsage("openai", "key1", "req", 10)
 	store.SetUsage("openai", "key1", "tokens", 1000)
 	store.SetUsage("openai", "key1", "errors", 1)
 	store.SetUsage("openai", "key1", "latency", 200)
-	selector := NewSelector(cfg, store)
+	selector := NewSelector(cfg, store, newTestLogger())
 
-	key := &config.Key{
-		ID:      "key1",
+	pCfg := &config.Provider{
+		ID:      "openai",
 		Pricing: config.Pricing{InputTokenCost: 0.01, OutputTokenCost: 0.02},
+		Limits:  config.Limits{MaxTokens: 4000},
 	}
-	score := selector.calculateScore("openai", key, "gpt-4o")
-	expected := 0.2*10 + 0.3*1000 + 0.2*1 + 0.1*200 + 0.2*(0.01+0.02)*1000/1000
+	key := &config.Key{
+		ID:           "key1",
+		SessionLimit: 10000,
+		SessionType:  "1h",
+	}
+	score := selector.calculateScore(pCfg, key, "gpt-4o", cfg.Policy)
+	expected := 0.2*10 + 0.3*1000 + 0.2*1 + 0.1*200 + 0.2*(0.01+0.02)*1000/1000 - 4000.0/1000.0*0.1
 	assert.InDelta(t, expected, score, 0.001)
 }
 
 func TestUpdateUsage(t *testing.T) {
 	cfg := &config.Config{}
-	store := newMockStore()
-	selector := NewSelector(cfg, store)
+	store := newMockStoreProvider()
+	selector := NewSelector(cfg, store, newTestLogger())
 
 	selector.UpdateUsage("openai", "key1", "req", 5)
 	val, _ := store.GetUsage("openai", "key1", "req")

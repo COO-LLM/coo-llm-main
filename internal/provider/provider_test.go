@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -108,6 +109,18 @@ func TestLLMConfig_NextAPIKey(t *testing.T) {
 	assert.Equal(t, "key1", cfg.NextAPIKey()) // Rotate back
 }
 
+func TestLLMConfig_NextAPIKeyWithEnv(t *testing.T) {
+	os.Setenv("TEST_KEY1", "resolved_key1")
+	os.Setenv("TEST_KEY2", "resolved_key2")
+	defer os.Unsetenv("TEST_KEY1")
+	defer os.Unsetenv("TEST_KEY2")
+
+	cfg := LLMConfig{APIKeys: []string{"${TEST_KEY1}", "${TEST_KEY2}"}}
+	assert.Equal(t, "resolved_key1", cfg.NextAPIKey())
+	assert.Equal(t, "resolved_key2", cfg.NextAPIKey())
+	assert.Equal(t, "resolved_key1", cfg.NextAPIKey()) // Rotate back
+}
+
 func TestLLMConfig_SelectLeastLoadedKey(t *testing.T) {
 	cfg := LLMConfig{APIKeys: []string{"key1", "key2", "key3"}}
 	cfg.InitUsages()
@@ -126,6 +139,23 @@ func TestLLMConfig_SelectLeastLoadedKey(t *testing.T) {
 
 	// key3 should be selected
 	assert.Equal(t, "key3", cfg.SelectLeastLoadedKey())
+}
+
+func TestLLMConfig_SelectLeastLoadedKeyWithEnv(t *testing.T) {
+	os.Setenv("TEST_KEY1", "resolved_key1")
+	os.Setenv("TEST_KEY2", "resolved_key2")
+	defer os.Unsetenv("TEST_KEY1")
+	defer os.Unsetenv("TEST_KEY2")
+
+	cfg := LLMConfig{APIKeys: []string{"${TEST_KEY1}", "${TEST_KEY2}"}}
+	cfg.InitUsages()
+
+	assert.Equal(t, "resolved_key1", cfg.SelectLeastLoadedKey())
+
+	// Update usage for first key to make second key selected
+	cfg.UpdateUsage(10, 1000)
+
+	assert.Equal(t, "resolved_key2", cfg.SelectLeastLoadedKey())
 }
 
 func TestLLMConfig_UpdateUsage(t *testing.T) {
@@ -158,6 +188,15 @@ func (m *mockProvider) GenerateStream(ctx context.Context, req *LLMRequest) (<-c
 		streamChan <- &LLMStreamResponse{Text: "ok", Done: true}
 	}()
 	return streamChan, nil
+}
+func (m *mockProvider) CreateEmbeddings(ctx context.Context, req *EmbeddingsRequest) (*EmbeddingsResponse, error) {
+	return &EmbeddingsResponse{
+		Embeddings: []Embedding{[]float64{0.1, 0.2, 0.3}},
+		Usage: TokenUsage{
+			PromptTokens: 5,
+			TotalTokens:  5,
+		},
+	}, nil
 }
 func (m *mockProvider) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"model1"}, nil
