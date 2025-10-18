@@ -39,3 +39,5 @@ bin/
 # OS
 .DS_Store
 Thumbs.db
+
+./node_module
