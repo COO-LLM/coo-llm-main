@@ -271,6 +271,15 @@ func (h *AdminHandler) GetMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Map client_key to id in tags
+	for i := range points {
+		if clientKey, exists := points[i].Tags["client_key"]; exists {
+			if id := h.getClientIDFromKey(clientKey); id != "" {
+				points[i].Tags["client_key"] = id
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"name":   name,
@@ -411,8 +420,36 @@ func (h *AdminHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		allPoints[mt] = points
 	}
 
+	// Handle id mapping
+	actualGroupBy := make([]string, len(groupBy))
+	copy(actualGroupBy, groupBy)
+	for i, g := range actualGroupBy {
+		if g == "id" {
+			actualGroupBy[i] = "client_key"
+		}
+	}
+
 	// Aggregate by group_by dimensions
-	stats := h.aggregateByGroups(allPoints, groupBy)
+	stats := h.aggregateByGroups(allPoints, actualGroupBy)
+
+	// Map client_key to id if needed
+	if h.contains(groupBy, "id") {
+		mappedStats := make(map[string]interface{})
+		for key, value := range stats {
+			if key == "unknown" {
+				// Try to find id for unknown keys
+				mappedStats["unknown"] = value
+			} else {
+				id := h.getClientIDFromKey(key)
+				if id != "" {
+					mappedStats[id] = value
+				} else {
+					mappedStats[key] = value
+				}
+			}
+		}
+		stats = mappedStats
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -422,6 +459,26 @@ func (h *AdminHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		"filters":  filters,
 		"stats":    stats,
 	})
+}
+
+// Helper function to check if slice contains string
+func (h *AdminHandler) contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// Helper function to get client ID from key
+func (h *AdminHandler) getClientIDFromKey(clientKey string) string {
+	for _, apiKey := range h.cfg.APIKeys {
+		if apiKey.Key == clientKey {
+			return apiKey.ID
+		}
+	}
+	return ""
 }
 
 func (h *AdminHandler) aggregateByGroups(allPoints map[string][]store.MetricPoint, groupBy []string) map[string]interface{} {
@@ -574,10 +631,17 @@ func (h *AdminHandler) CreateClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) ListClients(w http.ResponseWriter, r *http.Request) {
-	clients, err := h.store.ListClients()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	// Return clients from config (admin endpoint, keys are needed for management)
+	clients := make([]map[string]interface{}, len(h.cfg.APIKeys))
+	for i, apiKey := range h.cfg.APIKeys {
+		clients[i] = map[string]interface{}{
+			"id":                apiKey.ID,
+			"api_key":           apiKey.Key, // Full key for admin management
+			"description":       apiKey.Description,
+			"allowed_providers": apiKey.AllowedProviders,
+			"created_at":        0, // Not stored
+			"last_used":         0, // Not stored
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

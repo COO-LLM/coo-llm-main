@@ -214,6 +214,8 @@ func LoadConfig(path string) (*Config, error) {
 
 		viper.SetConfigFile(path)
 		viper.SetConfigType("yaml")
+		viper.AutomaticEnv()
+		viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 
 		if err := viper.ReadInConfig(); err != nil {
 			return nil, fmt.Errorf("failed to read config: %w", err)

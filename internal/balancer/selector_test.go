@@ -316,7 +316,7 @@ func TestCalculateScore(t *testing.T) {
 		SessionType:  "1h",
 	}
 	score := selector.calculateScore(pCfg, key, "gpt-4o", cfg.Policy)
-	expected := 0.2*10 + 0.3*1000 + 0.2*1 + 0.1*200 + 0.2*(0.01+0.02)*1000/1000 - 4000.0/1000.0*0.1
+	expected := 0.2*10 + 0.3*1000 + 0.2*1 + 0.1*200 + 0.2*(0.01+0.02)*1000/1000000 - 4000.0/1000.0*0.1
 	assert.InDelta(t, expected, score, 0.001)
 }
 

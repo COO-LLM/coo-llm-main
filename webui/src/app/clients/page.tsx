@@ -37,7 +37,7 @@ import { useApi } from '@/lib/api'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 // Mock data for clients
-const mockClientsData = [
+const mockClientsData: ClientData[] = [
   {
     id: 'client_1',
     apiKey: 'sk-1234567890abcdef',
@@ -46,7 +46,9 @@ const mockClientsData = [
     costIncurred: 1420.50,
     providersUsed: ['openai', 'anthropic'],
     lastActive: '2024-01-15 10:30',
-    status: 'active'
+    status: 'active',
+    createdAt: 0,
+    lastUsed: 0
   },
   {
     id: 'client_2',
@@ -56,7 +58,9 @@ const mockClientsData = [
     costIncurred: 825.00,
     providersUsed: ['openai', 'google'],
     lastActive: '2024-01-15 10:25',
-    status: 'active'
+    status: 'active',
+    createdAt: 0,
+    lastUsed: 0
   },
   {
     id: 'client_3',
@@ -66,7 +70,9 @@ const mockClientsData = [
     costIncurred: 490.00,
     providersUsed: ['anthropic', 'google'],
     lastActive: '2024-01-15 10:20',
-    status: 'active'
+    status: 'active',
+    createdAt: 0,
+    lastUsed: 0
   },
   {
     id: 'client_4',
@@ -76,7 +82,9 @@ const mockClientsData = [
     costIncurred: 225.00,
     providersUsed: ['openai'],
     lastActive: '2024-01-15 09:45',
-    status: 'inactive'
+    status: 'inactive',
+    createdAt: 0,
+    lastUsed: 0
   },
   {
     id: 'client_5',
@@ -86,7 +94,9 @@ const mockClientsData = [
     costIncurred: 600.00,
     providersUsed: ['openai', 'anthropic', 'google'],
     lastActive: '2024-01-15 10:15',
-    status: 'active'
+    status: 'active',
+    createdAt: 0,
+    lastUsed: 0
   },
   {
     id: 'client_6',
@@ -96,7 +106,9 @@ const mockClientsData = [
     costIncurred: 400.00,
     providersUsed: ['google'],
     lastActive: '2024-01-15 10:10',
-    status: 'active'
+    status: 'active',
+    createdAt: 0,
+    lastUsed: 0
   }
 ]
 
@@ -202,82 +214,88 @@ export default function ClientsPage() {
       const processedClients: ClientData[] = []
 
       // First, process clients from the client list
-      const clientMap = new Map<string, any>()
-      if (clientsResponse && clientsResponse.clients) {
-        clientsResponse.clients.forEach(client => {
-          clientMap.set(client.api_key || client.id, client)
-        })
-      }
+       const clientMap = new Map<string, any>()
+       const keyToIdMap = new Map<string, string>()
+       if (clientsResponse && clientsResponse.clients) {
+         clientsResponse.clients.forEach((client: any) => {
+           clientMap.set(client.id, client)
+           keyToIdMap.set(client.api_key, client.id)
+         })
+       }
 
       // Then add stats data - stats response has client_key at top level
-      if (statsResponse && statsResponse.stats) {
-        Object.entries(statsResponse.stats).forEach(([clientKey, stats]: [string, any]) => {
-          // Check if we have this client in the list, if not create a placeholder
-          let client = clientMap.get(clientKey)
-          if (!client) {
-            // Client exists in stats but not in list - create placeholder
-            client = {
-              api_key: clientKey,
-              id: clientKey,
-              description: '',
-              allowed_providers: [],
-              created_at: 0,
-              last_used: Math.floor(Date.now() / 1000) // Assume recently used if has stats
+       if (statsResponse && statsResponse.stats) {
+          Object.entries(statsResponse.stats).forEach(([clientKey, stats]: [string, any]) => {
+            // Map key to id if possible
+            const clientId = keyToIdMap.get(clientKey) || clientKey
+            // Check if we have this client in the list, if not create a placeholder
+            let client = clientMap.get(clientId)
+            if (!client) {
+              // Client exists in stats but not in list - create placeholder
+              client = {
+                api_key: clientKey, // Use the key for masking
+                id: clientId,
+                description: '',
+                allowed_providers: [],
+                created_at: 0,
+                last_used: Math.floor(Date.now() / 1000) // Assume recently used if has stats
+              }
+              clientMap.set(clientId, client)
             }
-            clientMap.set(clientKey, client)
-          }
 
-          // Stats format: direct stats object with queries/tokens/cost
-          const totalQueries = stats.queries || stats.requests || 0
-          const totalTokens = stats.tokens || 0
-          const totalCost = stats.cost || 0
+           // Stats format: direct stats object with queries/tokens/cost
+           const totalQueries = stats.queries || stats.requests || 0
+           const totalTokens = stats.tokens || 0
+           const totalCost = stats.cost || 0
 
-          // Determine status based on recent activity
-          const lastUsed = client.last_used || 0
-          const daysSinceLastUse = (Date.now() - lastUsed * 1000) / (1000 * 60 * 60 * 24)
-          const status = daysSinceLastUse < 7 ? 'active' : 'inactive'
+           // Determine status based on recent activity or usage
+           const hasUsage = totalQueries > 0
+           const lastUsed = client.last_used || 0
+           const daysSinceLastUse = (Date.now() - lastUsed * 1000) / (1000 * 60 * 60 * 24)
+           const status = hasUsage || daysSinceLastUse < 7 ? 'active' : 'inactive'
 
-          processedClients.push({
-            id: client.id || clientKey,
-            apiKey: client.api_key || clientKey,
-            description: client.description || '',
-            allowedProviders: client.allowed_providers || [],
-            totalQueries: Math.floor(totalQueries),
-            tokensConsumed: Math.floor(totalTokens),
-            costIncurred: totalCost,
-            providersUsed: [], // We don't have provider breakdown in this format
-            lastActive: lastUsed ? new Date(lastUsed * 1000).toLocaleString() : 'Never',
-            status,
-            createdAt: client.created_at || 0,
-            lastUsed
-          })
-        })
-      }
+           processedClients.push({
+             id: client.id || clientKey,
+             apiKey: client?.api_key || '',
+              description: client.description || '',
+              allowedProviders: client.allowed_providers || [],
+              totalQueries: Math.floor(totalQueries),
+              tokensConsumed: Math.floor(totalTokens),
+              costIncurred: totalCost,
+              providersUsed: [], // We don't have provider breakdown in this format
+              lastActive: lastUsed ? new Date(lastUsed * 1000).toLocaleString() : 'Never',
+              status,
+              createdAt: client.created_at || 0,
+              lastUsed
+            })
+         })
+       }
 
-      // Add clients from list that don't have stats yet
-      clientMap.forEach((client, clientKey) => {
-        // Check if already processed
-        if (!processedClients.find(c => c.apiKey === clientKey)) {
-          const lastUsed = client.last_used || 0
-          const daysSinceLastUse = (Date.now() - lastUsed * 1000) / (1000 * 60 * 60 * 24)
-          const status = daysSinceLastUse < 7 ? 'active' : 'inactive'
+       // Add clients from list that don't have stats yet
+       clientMap.forEach((client, clientId) => {
+         // Check if already processed
+         if (!processedClients.find(c => c.id === clientId)) {
+           const hasUsage = false // No stats yet
+           const lastUsed = client.last_used || 0
+           const daysSinceLastUse = (Date.now() - lastUsed * 1000) / (1000 * 60 * 60 * 24)
+           const status = hasUsage || daysSinceLastUse < 7 ? 'active' : 'inactive'
 
-          processedClients.push({
-            id: client.id || clientKey,
-            apiKey: client.api_key || clientKey,
-            description: client.description || '',
-            allowedProviders: client.allowed_providers || [],
-            totalQueries: 0,
-            tokensConsumed: 0,
-            costIncurred: 0,
-            providersUsed: [],
-            lastActive: lastUsed ? new Date(lastUsed * 1000).toLocaleString() : 'Never',
-            status,
-            createdAt: client.created_at || 0,
-            lastUsed
-          })
-        }
-      })
+           processedClients.push({
+             id: client.id || clientId,
+             apiKey: client.api_key || clientId,
+             description: client.description || '',
+             allowedProviders: client.allowed_providers || [],
+             totalQueries: 0,
+             tokensConsumed: 0,
+             costIncurred: 0,
+             providersUsed: [],
+             lastActive: lastUsed ? new Date(lastUsed * 1000).toLocaleString() : 'Never',
+             status,
+             createdAt: client.created_at || 0,
+             lastUsed
+           })
+         }
+       })
 
       setClientsData(processedClients)
       console.log('✅ Clients data processed:', processedClients.length, 'clients')
@@ -334,8 +352,9 @@ export default function ClientsPage() {
   }
 
   const maskApiKey = (apiKey: string) => {
-    if (apiKey.length <= 8) return apiKey
-    return apiKey.slice(0, 8) + '*'.repeat(apiKey.length - 8)
+    if (!apiKey) return '****'
+    if (apiKey.length <= 4) return apiKey
+    return apiKey.slice(0, 4) + '*'.repeat(apiKey.length - 4)
   }
 
   return (
@@ -409,20 +428,25 @@ export default function ClientsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tokens Consumed</CardTitle>
-              <Zap className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {(clientsData.reduce((sum, client) => sum + client.tokensConsumed, 0) / 1000000).toFixed(1)}M
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Total tokens processed
-              </p>
-            </CardContent>
-          </Card>
+           <Card>
+             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+               <CardTitle className="text-sm font-medium">Tokens Consumed</CardTitle>
+               <Zap className="h-4 w-4 text-muted-foreground" />
+             </CardHeader>
+             <CardContent>
+               <div className="text-2xl font-bold">
+                 {(() => {
+                   const total = clientsData.reduce((sum, client) => sum + client.tokensConsumed, 0)
+                   if (total >= 1000000) return (total / 1000000).toFixed(1) + 'M'
+                   if (total >= 1000) return (total / 1000).toFixed(1) + 'K'
+                   return total.toLocaleString()
+                 })()}
+               </div>
+               <p className="text-xs text-muted-foreground">
+                 Total tokens processed
+               </p>
+             </CardContent>
+           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

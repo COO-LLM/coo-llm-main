@@ -48,7 +48,22 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error": {"message": "Authentication context missing", "type": "authentication_error"}}`, http.StatusInternalServerError)
 		return
 	}
-	_ = allowedProviders
+
+	// Check if the requested model/provider is allowed for this API key
+	providerID := h.GetProviderFromModel(model)
+	if providerID != "" {
+		allowed := false
+		for _, allowedProvider := range allowedProviders {
+			if allowedProvider == "*" || allowedProvider == providerID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			http.Error(w, `{"error": {"message": "Provider not allowed for this API key", "type": "authentication_error"}}`, http.StatusForbidden)
+			return
+		}
+	}
 
 	// Extract messages
 	var messages []map[string]any
@@ -331,7 +346,7 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// If primary provider failed and fallback is enabled, try fallback providers
-	if err != nil && h.cfg.Policy.Fallback.Enabled && !stream {
+	if err != nil && h.cfg.Policy.Fallback.Enabled && !stream && pCfg != nil {
 		fallbackProviders := h.getFallbackProviders(pCfg.ID, modelName)
 		for _, fallbackID := range fallbackProviders {
 			if fallbackID == pCfg.ID {
@@ -362,10 +377,10 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Calculate cost
+	// Calculate cost (pricing is per 1 million tokens)
 	var cost float64
 	if key != nil {
-		cost = float64(resp.InputTokens)*pCfg.Pricing.InputTokenCost + float64(resp.OutputTokens)*pCfg.Pricing.OutputTokenCost
+		cost = (float64(resp.InputTokens)*pCfg.Pricing.InputTokenCost + float64(resp.OutputTokens)*pCfg.Pricing.OutputTokenCost) / 1000000
 	}
 
 	// Get client API key from context

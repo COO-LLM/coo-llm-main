@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Header } from '@/components/header'
-import { Sidebar } from '@/components/sidebar'
+import { Sidebar } from '@/components/Sidebar'
 import { useAuth } from '@/contexts/auth-context'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'

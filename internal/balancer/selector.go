@@ -272,7 +272,7 @@ func (s *Selector) calculateScore(pCfg *config.Provider, key *config.Key, _ stri
 
 	// Estimate cost based on average tokens (assume 1000 tokens per request for simplicity)
 	avgTokens := 1000.0
-	estimatedCost := (pCfg.Pricing.InputTokenCost + pCfg.Pricing.OutputTokenCost) * avgTokens / 1000
+	estimatedCost := (pCfg.Pricing.InputTokenCost + pCfg.Pricing.OutputTokenCost) * avgTokens / 1000000
 
 	score := w.ReqRatio*reqUsage + w.TokenRatio*tokenUsage + w.ErrorScore*errorScore + w.Latency*latency + w.CostRatio*estimatedCost
 

@@ -35,7 +35,7 @@ storage:
 llm_providers:
   - id: "openai"
     type: "openai"
-    api_keys: ["${OPENAI_API_KEY}"]
+    api_keys: ["fake-openai-key"]
     model: "gpt-4o"
     pricing:
       input_token_cost: 0.15
@@ -48,7 +48,7 @@ llm_providers:
       session_type: "1h"
   - id: "gemini"
     type: "gemini"
-    api_keys: ["${GEMINI_API_KEY}"]
+    api_keys: ["fake-gemini-key"]
     model: "gemini-2.5-pro"
     pricing:
       input_token_cost: 1.25
@@ -61,7 +61,7 @@ llm_providers:
       session_type: "1h"
   - id: "claude"
     type: "claude"
-    api_keys: ["${CLAUDE_API_KEY}"]
+    api_keys: ["fake-claude-key"]
     base_url: "https://api.anthropic.com"
     model: "claude-opus"
     pricing:
@@ -75,7 +75,7 @@ llm_providers:
       session_type: "1h"
   - id: "together"
     type: "together"
-    api_keys: ["${TOGETHER_API_KEY}"]
+    api_keys: ["fake-together-key"]
     model: "meta-llama/Llama-2-70b-chat-hf"
     pricing:
       input_token_cost: 0.0000002
@@ -88,7 +88,7 @@ llm_providers:
       session_type: "1h"
   - id: "openrouter"
     type: "openrouter"
-    api_keys: ["${OPENROUTER_API_KEY}"]
+    api_keys: ["fake-openrouter-key"]
     model: "anthropic/claude-3-haiku"
     pricing:
       input_token_cost: 0.00000025
@@ -101,7 +101,7 @@ llm_providers:
       session_type: "1h"
   - id: "mistral"
     type: "mistral"
-    api_keys: ["${MISTRAL_API_KEY}"]
+    api_keys: ["fake-mistral-key"]
     model: "mistral-large-latest"
     pricing:
       input_token_cost: 0.000002
@@ -114,7 +114,7 @@ llm_providers:
       session_type: "1h"
   - id: "cohere"
     type: "cohere"
-    api_keys: ["${COHERE_API_KEY}"]
+    api_keys: ["fake-cohere-key"]
     model: "command-r-plus"
     pricing:
       input_token_cost: 0.0000015
@@ -127,7 +127,7 @@ llm_providers:
       session_type: "1h"
   - id: "huggingface"
     type: "huggingface"
-    api_keys: ["${HUGGINGFACE_API_KEY}"]
+    api_keys: ["fake-huggingface-key"]
     model: "microsoft/DialoGPT-medium"
     pricing:
       input_token_cost: 0.0000002
@@ -140,7 +140,7 @@ llm_providers:
       session_type: "1h"
   - id: "replicate"
     type: "replicate"
-    api_keys: ["${REPLICATE_API_KEY}"]
+    api_keys: ["fake-replicate-key"]
     model: "meta/llama-2-70b-chat"
     pricing:
       input_token_cost: 0.00000065
@@ -153,7 +153,7 @@ llm_providers:
       session_type: "1h"
   - id: "voyage"
     type: "voyage"
-    api_keys: ["${VOYAGE_API_KEY}"]
+    api_keys: ["fake-voyage-key"]
     model: "voyage-large-2"
     pricing:
       input_token_cost: 0.00000012
@@ -166,7 +166,7 @@ llm_providers:
       session_type: "1h"
   - id: "fireworks"
     type: "fireworks"
-    api_keys: ["${FIREWORKS_API_KEY}"]
+    api_keys: ["fake-fireworks-key"]
     model: "accounts/fireworks/models/llama-v3-8b-instruct"
     pricing:
       input_token_cost: 0.0000002
@@ -178,32 +178,3 @@ llm_providers:
       session_limit: 2000000
       session_type: "1h"
 
-api_keys:
-  - id: "client-1"
-    key: "${API_KEY}"
-    allowed_providers: ["*"]  # Access all providers
-    description: "Default API key for all providers"
-
-# model_aliases removed due to YAML parsing bug with colon characters in values
-# Workaround: Use model names directly (e.g., "openai:gpt-4o") or define aliases at runtime
-
-policy:
-  algorithm: "hybrid"   # "round_robin", "least_loaded", "hybrid"
-  priority: "balanced"  # "balanced", "cost", "req", "token" (auto-sets weights)
-  hybrid_weights:       # Auto-set based on priority, or customize
-    token_ratio: 0.2
-    req_ratio: 0.2
-    error_score: 0.2
-    latency: 0.2
-    cost_ratio: 0.2
-  retry:
-    max_attempts: 3      # Max retry attempts
-    timeout: "30s"       # Timeout per attempt
-    interval: "1s"       # Interval between retries
-  fallback:
-    enabled: true        # Enable fallback to other providers
-    max_providers: 2     # Max fallback providers to try
-    # providers: ["openai", "together"]  # Optional: specific fallback providers
-  cache:
-    enabled: true        # Enable response caching
-    ttl_seconds: 10      # Cache TTL (10 seconds)

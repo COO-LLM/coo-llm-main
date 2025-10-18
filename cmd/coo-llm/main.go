@@ -29,13 +29,25 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Use CONFIG_PATH env var if set, else flag value
+	// Load config from CONFIG_PATH env var, flag, or default config.local.yaml or config.yaml
 	cfgPath := ""
 	if *configPath != "dummy" {
 		cfgPath = *configPath
 	}
 	if envPath := os.Getenv("CONFIG_PATH"); envPath != "" {
 		cfgPath = envPath
+	}
+	if cfgPath == "" {
+		// Try configs/config.local.yaml first, then configs/config.yaml, then config.local.yaml, config.yaml
+		if _, err := os.Stat("configs/config.local.yaml"); err == nil {
+			cfgPath = "configs/config.local.yaml"
+		} else if _, err := os.Stat("configs/config.yaml"); err == nil {
+			cfgPath = "configs/config.yaml"
+		} else if _, err := os.Stat("config.local.yaml"); err == nil {
+			cfgPath = "config.local.yaml"
+		} else if _, err := os.Stat("config.yaml"); err == nil {
+			cfgPath = "config.yaml"
+		}
 	}
 
 	cfg, err := config.LoadConfig(cfgPath)
@@ -47,6 +59,14 @@ func main() {
 	// Override port with PORT env var if set (for Railway, etc.)
 	if port := os.Getenv("PORT"); port != "" {
 		cfg.Server.Listen = ":" + port
+	}
+
+	// Override admin credentials with env vars
+	if adminID := os.Getenv("ADMIN_ID"); adminID != "" {
+		cfg.Server.WebUI.AdminID = adminID
+	}
+	if adminPassword := os.Getenv("ADMIN_PASSWORD"); adminPassword != "" {
+		cfg.Server.WebUI.AdminPassword = adminPassword
 	}
 
 	if err := config.ValidateConfig(cfg); err != nil {
