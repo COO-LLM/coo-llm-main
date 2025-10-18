@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -47,13 +48,14 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error": {"message": "Authentication context missing", "type": "authentication_error"}}`, http.StatusInternalServerError)
 		return
 	}
+	_ = allowedProviders
 
 	// Extract messages
-	var messages []map[string]interface{}
-	if msgs, ok := req["messages"].([]interface{}); ok && len(msgs) > 0 {
-		messages = make([]map[string]interface{}, len(msgs))
+	var messages []map[string]any
+	if msgs, ok := req["messages"].([]any); ok && len(msgs) > 0 {
+		messages = make([]map[string]any, len(msgs))
 		for i, msg := range msgs {
-			if m, ok := msg.(map[string]interface{}); ok {
+			if m, ok := msg.(map[string]any); ok {
 				messages[i] = m
 			}
 		}
@@ -85,7 +87,7 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 
 		if cacheHit {
 			// Return cached response
-			var cached map[string]interface{}
+			var cached map[string]any
 			if json.Unmarshal([]byte(cachedResp), &cached) == nil {
 				cached["cache_hit"] = true
 				w.Header().Set("Content-Type", "application/json")
@@ -124,22 +126,61 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 	}
 
 	for attempt := 0; attempt < retryCfg.MaxAttempts; attempt++ {
-		pCfg, key, modelName, err = h.selector.SelectBest(model)
+		pCfg, _, modelName, err = h.selector.SelectBest(model)
 		if err != nil {
 			break
 		}
+		if pCfg == nil {
+			err = fmt.Errorf("no provider selected")
+			break
+		}
 
-		// Check if provider is allowed
-		allowed := false
-		for _, allowedProvider := range allowedProviders {
-			if allowedProvider == "*" || allowedProvider == pCfg.ID {
-				allowed = true
+		// Check for recommended key in store
+		recommendKey := ""
+		cacheKey := "recommend_" + pCfg.ID
+		if cached, cacheErr := h.selector.GetCache(cacheKey); cacheErr == nil && cached != "" {
+			recommendKey = cached
+			// Delete from cache immediately
+			h.selector.SetCache(cacheKey, "", 0)
+		}
+
+		// Select key
+		if recommendKey != "" {
+			// Find the recommended key
+			key = nil
+			for i := range pCfg.Keys {
+				if pCfg.Keys[i].ID == recommendKey {
+					key = &pCfg.Keys[i]
+					break
+				}
+			}
+			if key == nil {
+				// Recommended key not found, fall back to algorithm
+				key, err = h.selector.SelectKeyForProvider(pCfg, modelName)
+				if err != nil {
+					break
+				}
+			}
+		} else {
+			// Use algorithm to select key
+			key, err = h.selector.SelectKeyForProvider(pCfg, modelName)
+			if err != nil {
 				break
 			}
 		}
-		if !allowed {
-			err = fmt.Errorf("access denied to provider %s", pCfg.ID)
+
+		if key == nil {
+			err = fmt.Errorf("no key selected")
 			break
+		}
+
+		// Update req usage immediately to avoid spam on this key
+		h.selector.UpdateUsage(pCfg.ID, key.ID, "req", 1)
+
+		// Limit max tokens by provider's limit
+		limitedMaxTokens := maxTokens
+		if pCfg.Limits.MaxTokens > 0 && limitedMaxTokens > pCfg.Limits.MaxTokens {
+			limitedMaxTokens = pCfg.Limits.MaxTokens
 		}
 
 		prov, err := h.reg.Get(pCfg.ID)
@@ -151,7 +192,7 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 			Prompt:    prompt,
 			Messages:  messages,
 			Model:     modelName,
-			MaxTokens: maxTokens,
+			MaxTokens: limitedMaxTokens,
 			Stream:    stream,
 			User:      user,
 			Params:    req,
@@ -185,19 +226,19 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 					if chunk.Done {
 						if chunk.Text != "" && !strings.HasPrefix(chunk.Text, "Error:") {
 							// Send final usage data
-							usageData := map[string]interface{}{
+							usageData := map[string]any{
 								"id":      fmt.Sprintf("%d", time.Now().UnixNano()),
 								"object":  "chat.completion.chunk",
 								"created": time.Now().Unix(),
 								"model":   model,
-								"choices": []map[string]interface{}{
+								"choices": []map[string]any{
 									{
 										"index":         0,
 										"delta":         map[string]string{},
 										"finish_reason": chunk.FinishReason,
 									},
 								},
-								"usage": map[string]interface{}{
+								"usage": map[string]any{
 									"prompt_tokens":     0, // TODO: track properly
 									"completion_tokens": 0,
 									"total_tokens":      0,
@@ -212,15 +253,15 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 						return
 					}
 
-					chunkData := map[string]interface{}{
+					chunkData := map[string]any{
 						"id":      fmt.Sprintf("%d", time.Now().UnixNano()),
 						"object":  "chat.completion.chunk",
 						"created": time.Now().Unix(),
 						"model":   model,
-						"choices": []map[string]interface{}{
+						"choices": []map[string]any{
 							{
 								"index": 0,
-								"delta": map[string]interface{}{
+								"delta": map[string]any{
 									"content": chunk.Text,
 								},
 								"finish_reason": nil,
@@ -233,8 +274,13 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 				}
 			}()
 
-			// Update usage for streaming (simplified)
-			h.selector.UpdateUsage(pCfg.ID, key.ID, "req", 1)
+			// Update usage for streaming (req already updated when selected)
+
+			// Calculate and cache recommended key for next time
+			if recommended := h.selector.GetRecommendedKey(pCfg, modelName); recommended != nil {
+				cacheKey := "recommend_" + pCfg.ID
+				h.selector.SetCache(cacheKey, recommended.ID, 3600) // 1 hour TTL
+			}
 			return
 		}
 
@@ -247,20 +293,61 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 			if resp == nil {
 				err = fmt.Errorf("provider returned nil response")
 			} else {
-				// Success, update usage
-				h.selector.UpdateUsage(pCfg.ID, key.ID, "req", 1)
-				h.selector.UpdateUsage(pCfg.ID, key.ID, "input_tokens", float64(resp.InputTokens))
-				h.selector.UpdateUsage(pCfg.ID, key.ID, "output_tokens", float64(resp.OutputTokens))
-				h.selector.UpdateUsage(pCfg.ID, key.ID, "tokens", float64(resp.TokensUsed))
-				h.selector.UpdateUsage(pCfg.ID, key.ID, "latency", float64(latency))
+				// Success, update usage (req already updated when selected)
+				if key != nil {
+					h.selector.UpdateUsage(pCfg.ID, key.ID, "input_tokens", float64(resp.InputTokens))
+					h.selector.UpdateUsage(pCfg.ID, key.ID, "output_tokens", float64(resp.OutputTokens))
+					h.selector.UpdateUsage(pCfg.ID, key.ID, "tokens", float64(resp.TokensUsed))
+					h.selector.UpdateUsage(pCfg.ID, key.ID, "latency", float64(latency))
+				}
+
+				// Calculate and cache recommended key for next time
+				if recommended := h.selector.GetRecommendedKey(pCfg, modelName); recommended != nil {
+					cacheKey := "recommend_" + pCfg.ID
+					h.selector.SetCache(cacheKey, recommended.ID, 3600) // 1 hour TTL
+				}
 				break
 			}
 		}
 		if err != nil {
 			// Error, update error usage
-			h.selector.UpdateUsage(pCfg.ID, key.ID, "errors", 1)
+			h.logger.LogRequest(r.Context(), &log.LogEntry{
+				Provider:  pCfg.ID,
+				Model:     model,
+				ReqID:     fmt.Sprintf("%d", time.Now().UnixNano()),
+				LatencyMS: latency,
+				Status:    500,
+				Tokens:    0,
+				Cost:      0,
+				Error:     err.Error(),
+			})
+			if key != nil {
+				h.selector.UpdateUsage(pCfg.ID, key.ID, "errors", 1)
+			}
 			if attempt < retryCfg.MaxAttempts-1 {
 				time.Sleep(retryCfg.Interval)
+			}
+		}
+	}
+
+	// If primary provider failed and fallback is enabled, try fallback providers
+	if err != nil && h.cfg.Policy.Fallback.Enabled && !stream {
+		fallbackProviders := h.getFallbackProviders(pCfg.ID, modelName)
+		for _, fallbackID := range fallbackProviders {
+			if fallbackID == pCfg.ID {
+				continue // Skip same provider
+			}
+
+			// Try fallback provider
+			fallbackPCfg, fallbackKey, fallbackModelName, fallbackResp, fallbackErr := h.tryFallbackProvider(fallbackID, modelName, req, stream)
+			if fallbackErr == nil && fallbackResp != nil {
+				// Fallback success, use this response
+				pCfg = fallbackPCfg
+				key = fallbackKey
+				modelName = fallbackModelName
+				resp = fallbackResp
+				err = nil
+				break
 			}
 		}
 	}
@@ -270,8 +357,16 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if resp == nil {
+		http.Error(w, "Provider returned nil response", http.StatusInternalServerError)
+		return
+	}
+
 	// Calculate cost
-	cost := float64(resp.InputTokens)*key.Pricing.InputTokenCost + float64(resp.OutputTokens)*key.Pricing.OutputTokenCost
+	var cost float64
+	if key != nil {
+		cost = float64(resp.InputTokens)*pCfg.Pricing.InputTokenCost + float64(resp.OutputTokens)*pCfg.Pricing.OutputTokenCost
+	}
 
 	// Get client API key from context
 	var clientKey string
@@ -280,7 +375,11 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Store metrics for historical data
-	tags := map[string]string{"provider": pCfg.ID, "key": key.ID, "model": modelName, "client_key": clientKey}
+	providerName := pCfg.Name
+	if providerName == "" {
+		providerName = pCfg.ID
+	}
+	tags := map[string]string{"provider": providerName, "key": key.ID, "model": modelName, "client_key": clientKey}
 	h.store.StoreMetric("latency", float64(latency), tags, time.Now().Unix())
 	h.store.StoreMetric("tokens", float64(resp.TokensUsed), tags, time.Now().Unix())
 	h.store.StoreMetric("cost", cost, tags, time.Now().Unix())
@@ -299,12 +398,12 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 	})
 
 	// Prepare response
-	openaiResp := map[string]interface{}{
+	openaiResp := map[string]any{
 		"id":      reqID,
 		"object":  "chat.completion",
 		"created": time.Now().Unix(),
 		"model":   model,
-		"choices": []map[string]interface{}{
+		"choices": []map[string]any{
 			{
 				"index": 0,
 				"message": map[string]string{
@@ -314,7 +413,7 @@ func (h *ChatCompletionsHandler) Handle(w http.ResponseWriter, r *http.Request) 
 				"finish_reason": resp.FinishReason,
 			},
 		},
-		"usage": map[string]interface{}{
+		"usage": map[string]any{
 			"prompt_tokens":     resp.InputTokens,
 			"completion_tokens": resp.OutputTokens,
 			"total_tokens":      resp.TokensUsed,
@@ -424,9 +523,110 @@ func (h *ChatCompletionsHandler) GetProviderFromModel(model string) string {
 	return "" // No provider found
 }
 
+// getFallbackProviders returns list of fallback provider IDs to try
+func (h *ChatCompletionsHandler) getFallbackProviders(primaryID, modelName string) []string {
+	fallbackCfg := h.cfg.Policy.Fallback
+
+	// If specific fallback providers configured, use them
+	if len(fallbackCfg.Providers) > 0 {
+		maxCount := int(math.Min(float64(len(fallbackCfg.Providers)), float64(fallbackCfg.MaxProviders)))
+		return fallbackCfg.Providers[:maxCount]
+	}
+
+	// Otherwise, try to find providers that might support similar models
+	var candidates []string
+	for _, lp := range h.cfg.LLMProviders {
+		if lp.ID != primaryID {
+			// Simple heuristic: prefer providers with similar model names or OpenAI-compatible ones
+			if strings.Contains(lp.Model, modelName) ||
+				strings.Contains(modelName, lp.Model) ||
+				lp.Type == "openai" {
+				candidates = append(candidates, lp.ID)
+			}
+		}
+	}
+
+	// Limit to MaxProviders
+	if len(candidates) > fallbackCfg.MaxProviders {
+		candidates = candidates[:fallbackCfg.MaxProviders]
+	}
+
+	return candidates
+}
+
+// tryFallbackProvider attempts to use a fallback provider and returns the response
+func (h *ChatCompletionsHandler) tryFallbackProvider(providerID, modelName string, req map[string]any, stream bool) (*config.Provider, *config.Key, string, *provider.LLMResponse, error) {
+	// Select fallback provider
+	pCfg, key, resolvedModelName, err := h.selector.SelectBest(providerID + ":" + modelName)
+	if err != nil {
+		return nil, nil, "", nil, err
+	}
+
+	// Get provider instance
+	prov, err := h.reg.Get(pCfg.ID)
+	if err != nil {
+		return nil, nil, "", nil, err
+	}
+
+	// Prepare request
+	maxTokens := 1000
+	if mt, ok := req["max_tokens"].(float64); ok {
+		maxTokens = int(mt)
+	}
+
+	user := ""
+	if u, ok := req["user"].(string); ok {
+		user = u
+	}
+
+	providerReq := &provider.LLMRequest{
+		Prompt:    "", // Will be set from messages
+		Messages:  nil,
+		Model:     resolvedModelName,
+		MaxTokens: maxTokens,
+		Stream:    stream,
+		User:      user,
+	}
+
+	// Convert messages
+	if msgs, ok := req["messages"].([]any); ok {
+		providerReq.Messages = make([]map[string]any, len(msgs))
+		for i, msg := range msgs {
+			if msgMap, ok := msg.(map[string]any); ok {
+				providerReq.Messages[i] = msgMap
+			}
+		}
+	}
+
+	// Try the request
+	ctx, cancel := context.WithTimeout(context.Background(), h.cfg.Policy.Retry.Timeout)
+	defer cancel()
+
+	var resp *provider.LLMResponse
+	if stream {
+		// For fallback, we don't handle streaming yet - just test if provider works
+		_, err = prov.GenerateStream(ctx, providerReq)
+	} else {
+		resp, err = prov.Generate(ctx, providerReq)
+	}
+
+	if err != nil {
+		// Update error usage for fallback provider
+		if key != nil {
+			h.selector.UpdateUsage(pCfg.ID, key.ID, "errors", 1)
+		}
+		return nil, nil, "", nil, err
+	}
+
+	return pCfg, key, resolvedModelName, resp, nil
+}
+
 func SetupRoutes(r chi.Router, selector *balancer.Selector, logger *log.Logger, reg *provider.Registry, cfg *config.Config, store store.RuntimeStore) {
 	handler := NewChatCompletionsHandler(selector, logger, reg, cfg, store)
 	r.With(AuthMiddleware(cfg.APIKeys)).Post("/v1/chat/completions", handler.Handle)
+
+	embeddingsHandler := NewEmbeddingsHandler(selector, logger, reg, cfg, store)
+	r.With(AuthMiddleware(cfg.APIKeys)).Post("/v1/embeddings", embeddingsHandler.Handle)
 
 	SetupModelsRoute(r, cfg)
 }

@@ -47,7 +47,7 @@ export GEMINI_API_KEY="your-gemini-key"
 ./bin/coo-llm
 
 # Test simple request
-curl -X POST http://localhost:2906/v1/chat/completions \
+curl -X POST http://localhost:2906/api/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model": "openai:gpt-4o", "messages": [{"role": "user", "content": "Hello!"}]}'
 ```

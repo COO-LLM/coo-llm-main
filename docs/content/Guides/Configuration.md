@@ -40,6 +40,18 @@ version: "1.0"
 server:
   listen: ":2906"
   admin_api_key: "${ADMIN_API_KEY}"
+  cors:
+    enabled: true
+    allowed_origins: ["*"]
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["*"]
+    allow_credentials: true
+    max_age: 86400
+  webui:
+    enabled: true
+    admin_id: "admin"
+    admin_password: "password"
+    # web_ui_path: "/path/to/custom/ui"  # Optional: custom web UI path
 
 logging:
   file:
@@ -57,7 +69,8 @@ storage:
     type: "file"
     path: "./data/config.json"
   runtime:
-    type: "memory" 
+    type: "sql"
+    addr: "./data/coo-llm.db" 
 
 llm_providers:
   - id: "openai"
@@ -93,12 +106,12 @@ llm_providers:
       tokens_per_min: 60000
 
 api_keys:
-  - key: "${API_KEY}"
+  - id: "default-client"  # Optional unique identifier
+    key: "${API_KEY}"
     allowed_providers: ["*"]  # Access all providers
     description: "Default API key for all providers"
 
-# model_aliases: Use inline format to avoid YAML parsing issues with colon characters
-model_aliases: {
+model_aliases: {  # Use inline format to avoid YAML parsing issues with colon characters
   "gpt-4o": "openai:gpt-4o",
   "gpt-4o-mini": "openai:gpt-4o-mini",
   "gpt-4-turbo": "openai:gpt-4-turbo",
@@ -133,6 +146,10 @@ policy:
     max_attempts: 3      # Max retry attempts
     timeout: "30s"       # Timeout per attempt
     interval: "1s"       # Interval between retries
+  fallback:
+    enabled: true
+    max_providers: 2
+    providers: ["openai", "gemini"]
   cache:
     enabled: true        # Enable response caching
     ttl_seconds: 10      # Cache TTL (10 seconds)
@@ -146,6 +163,21 @@ policy:
 |-------|------|---------|-------------|
 | `listen` | string | `:2906` | Server listen address |
 | `admin_api_key` | string | - | API key for admin endpoints |
+| `cors.enabled` | bool | `true` | Enable CORS support |
+| `cors.allowed_origins` | []string | `["*"]` | Allowed origins or `["*"]` for all |
+| `cors.allowed_methods` | []string | `["GET", "POST", "PUT", "DELETE", "OPTIONS"]` | Allowed HTTP methods |
+| `cors.allowed_headers` | []string | `["*"]` | Allowed headers or `["*"]` for all |
+| `cors.allow_credentials` | bool | `true` | Allow credentials in CORS requests |
+| `cors.max_age` | int | `86400` | Preflight cache duration in seconds |
+
+#### Web UI Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `true` | Enable web UI |
+| `admin_id` | string | `admin` | Admin login username |
+| `admin_password` | string | `password` | Admin login password |
+| `web_ui_path` | string | - | Custom path to web UI build directory (optional) |
 
 ### Logging Configuration
 
@@ -178,7 +210,7 @@ Array of log provider configurations:
 ### Storage Configuration
 
 #### Config Storage
-Used for dynamic config loading/saving (not currently implemented).
+Used for dynamic config loading/saving with automatic masking of sensitive data.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -190,20 +222,23 @@ Used for caching, sessions, and runtime data.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `type` | string | `memory` | Storage type (`memory`, `redis`, `file`, `http`) |
-| `addr` | string | `localhost:6379` | Redis address, InfluxDB URL, or HTTP endpoint |
+| `type` | string | `sql` | Storage type (`redis`, `http`, `sql`, `mongodb`, `dynamodb`, `influxdb`) |
+| `addr` | string | `./data/coo-llm.db` | Connection string, file path, or endpoint |
 | `password` | string | - | Redis password or InfluxDB token |
 | `api_key` | string | - | API key for HTTP storage or InfluxDB org |
 | `database` | string | - | Database name for MongoDB or InfluxDB bucket |
 
 **Storage Types:**
-- `memory`: In-memory storage (fast, not persistent)
-- `file`: File-based storage (persistent, local)
 - `redis`: Redis database (persistent, distributed)
+- `sql`: SQL database (SQLite/PostgreSQL, persistent)
+- `mongodb`: MongoDB document database (persistent)
+- `dynamodb`: AWS DynamoDB (persistent, serverless)
 - `influxdb`: InfluxDB time-series database (historical metrics, persistent)
 - `http`: HTTP endpoint storage (remote API)
 
 ### LLM Provider Configuration
+
+> **Note:** The `providers` field is a legacy field and should not be used. Please use `llm_providers` instead.
 
 Array of LLM provider configurations:
 
@@ -250,17 +285,28 @@ Array of client API key configurations:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `id` | string | Optional unique identifier for the API key |
 | `key` | string | Client API key for authentication |
 | `allowed_providers` | []string | Array of allowed provider IDs or `["*"]` for all |
 | `description` | string | Human-readable description |
 
 ### Model Aliases
 
-Use provider:model names directly:
+Model aliases map short names to provider:model combinations for convenience:
+
+```yaml
+model_aliases: {
+  "gpt-4o": "openai:gpt-4o",
+  "claude": "claude:claude-3-opus-20240229"
+}
+```
+
+You can also use provider:model names directly:
 
 ```bash
 # Examples
-"openai:gpt-4o"
+"gpt-4o"           # Uses alias
+"openai:gpt-4o"    # Direct provider:model
 "gemini:gemini-1.5-pro"
 ```
 
@@ -277,6 +323,9 @@ Load balancing and routing policy:
 | `retry.max_attempts` | int | `3` | Maximum retry attempts on failure |
 | `retry.timeout` | duration | `30s` | Timeout per attempt |
 | `retry.interval` | duration | `1s` | Delay between retries |
+| `fallback.enabled` | bool | `true` | Enable fallback to other providers |
+| `fallback.max_providers` | int | `2` | Max fallback providers to try |
+| `fallback.providers` | []string | - | List of fallback provider IDs |
 | `cache.enabled` | bool | `true` | Enable response caching |
 | `cache.ttl_seconds` | int64 | `10` | Cache TTL in seconds |
 
@@ -292,7 +341,7 @@ Use full provider:model names directly (no aliases needed):
 "grok:grok-beta"
 ```
 
-**Note:** Model aliases were removed due to YAML parsing issues. Use provider:model format instead.
+**Note:** Model aliases use inline YAML format to avoid parsing issues with colon characters. You can also use provider:model format directly.
 
 ### Policy Configuration
 
@@ -382,7 +431,7 @@ llm_providers:
     api_keys: ["sk-your-key"]
     model: "gpt-4o"
 
-# model_aliases removed - use provider:model format directly
+# model_aliases supported - maps short names to provider:model combinations
 ```
 
 ### Production Configuration
@@ -436,14 +485,16 @@ llm_providers:
       tokens_per_min: 80000
 
 api_keys:
-  - key: "client-a-key"
+  - id: "client-a"
+    key: "client-a-key"
     allowed_providers: ["openai-prod"]
     description: "Client A - OpenAI only"
-  - key: "premium-key"
+  - id: "premium-client"
+    key: "premium-key"
     allowed_providers: ["openai-prod", "gemini-prod"]
     description: "Premium client with all providers"
 
-# model_aliases removed - use "openai-prod:gpt-4o" or "gemini-prod:gemini-1.5-pro" directly
+# model_aliases supported - or use "openai-prod:gpt-4o" or "gemini-prod:gemini-1.5-pro" directly
 
 policy:
   algorithm: "hybrid"

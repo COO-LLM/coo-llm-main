@@ -145,6 +145,11 @@ func (p *ClaudeProvider) GenerateStream(ctx context.Context, req *LLMRequest) (<
 	return streamChan, nil
 }
 
+func (p *ClaudeProvider) CreateEmbeddings(ctx context.Context, req *EmbeddingsRequest) (*EmbeddingsResponse, error) {
+	// Claude doesn't have native embeddings support
+	return nil, fmt.Errorf("embeddings not supported by Claude provider")
+}
+
 func (p *ClaudeProvider) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"claude-3-opus", "claude-3-sonnet", "claude-3-haiku"}, nil
 }

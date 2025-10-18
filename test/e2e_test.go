@@ -73,6 +73,78 @@ func (m *mockStore) GetMetrics(name string, tags map[string]string, start, end i
 	return []store.MetricPoint{}, nil
 }
 
+func (m *mockStore) LoadConfig() (*config.Config, error) {
+	return &config.Config{Policy: config.Policy{Algorithm: "round_robin"}}, nil
+}
+
+func (m *mockStore) SaveConfig(cfg *config.Config) error {
+	return nil
+}
+
+func (m *mockStore) CreateClient(clientID, apiKey, description string, allowedProviders []string) error {
+	return nil
+}
+
+func (m *mockStore) UpdateClient(clientID, description string, allowedProviders []string) error {
+	return nil
+}
+
+func (m *mockStore) DeleteClient(clientID string) error {
+	return nil
+}
+
+func (m *mockStore) GetClient(clientID string) (*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStore) ListClients() ([]*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStore) ValidateClient(apiKey string) (*store.ClientInfo, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetClientMetrics(clientID string, start, end int64) (*store.ClientMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetProviderMetrics(providerID string, start, end int64) (*store.ProviderMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetKeyMetrics(providerID, keyID string, start, end int64) (*store.KeyMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetGlobalMetrics(start, end int64) (*store.GlobalMetrics, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetClientTimeSeries(clientID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetProviderTimeSeries(providerID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStore) GetKeyTimeSeries(providerID, keyID string, start, end int64, interval string) ([]store.TimeSeriesPoint, error) {
+	return nil, nil
+}
+
+func (m *mockStore) SaveAlgorithmConfig(algorithm string, config map[string]interface{}) error {
+	return nil
+}
+
+func (m *mockStore) LoadAlgorithmConfig(algorithm string) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (m *mockStore) ListAlgorithms() ([]string, error) {
+	return []string{"round_robin", "least_loaded", "hybrid"}, nil
+}
+
 // Mock provider that simulates external API
 type e2eMockProvider struct{}
 
@@ -92,6 +164,15 @@ func (m *e2eMockProvider) GenerateStream(ctx context.Context, req *provider.LLMR
 		streamChan <- &provider.LLMStreamResponse{Text: "Hello! How can I help you today?", Done: true}
 	}()
 	return streamChan, nil
+}
+func (m *e2eMockProvider) CreateEmbeddings(ctx context.Context, req *provider.EmbeddingsRequest) (*provider.EmbeddingsResponse, error) {
+	return &provider.EmbeddingsResponse{
+		Embeddings: []provider.Embedding{[]float64{0.1, 0.2, 0.3}},
+		Usage: provider.TokenUsage{
+			PromptTokens: 5,
+			TotalTokens:  5,
+		},
+	}, nil
 }
 func (m *e2eMockProvider) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"gemini-1.5-pro"}, nil
@@ -132,9 +213,9 @@ func TestE2E_ChatCompletionsFlow(t *testing.T) {
 	reg := provider.NewRegistry()
 	reg.Register(&e2eMockProvider{})
 
-	runtimeStore := &mockStore{}
-	selector := balancer.NewSelector(cfg, runtimeStore)
 	logger := log.NewLogger(&config.Logging{})
+	runtimeStore := &mockStore{}
+	selector := balancer.NewSelector(cfg, runtimeStore, logger)
 
 	// Setup router
 	r := chi.NewRouter()
