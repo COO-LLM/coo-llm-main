@@ -36,8 +36,9 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
-    - name: Run tests with coverage
-      run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+    - name: Run tests
+      run: CGO_ENABLED=1 go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -45,6 +46,7 @@ jobs:
         file: ./coverage.out
         flags: unittests
         name: codecov-umbrella
+
 
     - name: Run go vet
       run: go vet ./...
