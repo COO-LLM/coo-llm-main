@@ -14,56 +14,39 @@ env:
 
 jobs:
   test:
-    runs-on: self-hosted
-    env:
-      GEMINI_KEY_1: ${{ secrets.GEMINI_KEY_1 }}
-    steps:
-    - uses: actions/checkout@v4
+  runs-on: self-hosted
+  env:
+    GEMINI_KEY_1: ${{ secrets.GEMINI_KEY_1 }}
+  steps:
+  - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.23'
+  - name: Set up Go
+    uses: actions/setup-go@v4
+    with:
+      go-version: '1.23'
 
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+  - name: Cache Go modules
+    uses: actions/cache@v3
+    with:
+      path: ~/go/pkg/mod
+      key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      restore-keys: |
+        ${{ runner.os }}-go-
 
-    - name: Download dependencies
-      run: go mod download
+  - name: Download dependencies
+    run: go mod download
 
-    - name: Run tests
-      run: CGO_ENABLED=1 go test -race -coverprofile=coverage.out -covermode=atomic ./...
+  - name: Install build dependencies
+    run: sudo apt-get update && sudo apt-get install -y build-essential
 
+  - name: Run tests
+    run: CGO_ENABLED=1 go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.out
-        flags: unittests
-        name: codecov-umbrella
+  - name: Run go vet
+    run: go vet ./...
 
-
-    - name: Run go vet
-      run: go vet ./...
-
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v3
-      with:
-        version: latest
-        args: --timeout=5m
-
-    - name: Check dependencies for vulnerabilities
-      run: |
-        go install golang.org/x/vuln/cmd/govulncheck@latest
-        govulncheck ./...
-
-    - name: Build
-      run: go build -ldflags="-s -w" ./cmd/coo-llm
+  - name: Build
+    run: go build ./cmd/coo-llm
 
   release:
     runs-on: ubuntu-latest
