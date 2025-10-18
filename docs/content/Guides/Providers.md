@@ -217,6 +217,8 @@ All providers implement the `LLMProvider` interface defined in `internal/provide
 type LLMProvider interface {
     Name() string
     Generate(ctx context.Context, req *LLMRequest) (*LLMResponse, error)
+    GenerateStream(ctx context.Context, req *LLMRequest) (<-chan *LLMStreamResponse, error)
+    CreateEmbeddings(ctx context.Context, req *EmbeddingsRequest) (*EmbeddingsResponse, error)
     ListModels(ctx context.Context) ([]string, error)
 }
 ```
@@ -225,11 +227,13 @@ type LLMProvider interface {
 
 ```go
 type LLMRequest struct {
-    Prompt    string                   `json:"prompt"`
-    Messages  []map[string]interface{} `json:"messages,omitempty"`
-    Model     string                   `json:"model,omitempty"`
-    MaxTokens int                      `json:"max_tokens,omitempty"`
-    Params    map[string]any           `json:"params,omitempty"`
+    Prompt    string           `json:"prompt"`
+    Messages  []map[string]any `json:"messages,omitempty"`
+    Model     string           `json:"model,omitempty"`
+    MaxTokens int              `json:"max_tokens,omitempty"`
+    Stream    bool             `json:"stream,omitempty"`
+    User      string           `json:"user,omitempty"`
+    Params    map[string]any   `json:"params,omitempty"`
 }
 ```
 
@@ -242,6 +246,43 @@ type LLMResponse struct {
     OutputTokens int    `json:"output_tokens"`
     TokensUsed   int    `json:"tokens_used"`
     FinishReason string `json:"finish_reason"`
+}
+```
+
+### Stream Response Structure
+
+```go
+type LLMStreamResponse struct {
+    Text         string `json:"text,omitempty"`
+    FinishReason string `json:"finish_reason,omitempty"`
+    Done         bool   `json:"done"`
+}
+```
+
+### Embeddings Request Structure
+
+```go
+type EmbeddingsRequest struct {
+    Model  string         `json:"model"`
+    Input  []string       `json:"input"`
+    User   string         `json:"user,omitempty"`
+    Params map[string]any `json:"params,omitempty"`
+}
+```
+
+### Embeddings Response Structure
+
+```go
+type EmbeddingsResponse struct {
+    Embeddings []Embedding `json:"embeddings"`
+    Usage      TokenUsage  `json:"usage"`
+}
+
+type Embedding []float64
+
+type TokenUsage struct {
+	PromptTokens int `json:"prompt_tokens"`
+	TotalTokens  int `json:"total_tokens"`
 }
 ```
 

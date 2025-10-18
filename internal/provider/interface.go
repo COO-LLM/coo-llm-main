@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +16,7 @@ type LLMProvider interface {
 	Name() string
 	Generate(ctx context.Context, req *LLMRequest) (*LLMResponse, error)
 	GenerateStream(ctx context.Context, req *LLMRequest) (<-chan *LLMStreamResponse, error)
+	CreateEmbeddings(ctx context.Context, req *EmbeddingsRequest) (*EmbeddingsResponse, error)
 	ListModels(ctx context.Context) ([]string, error)
 }
 
@@ -21,10 +24,18 @@ type LLMProvider interface {
 type ProviderType string
 
 const (
-	ProviderOpenAI ProviderType = "openai"
-	ProviderGemini ProviderType = "gemini"
-	ProviderClaude ProviderType = "claude"
-	ProviderGrok   ProviderType = "grok"
+	ProviderOpenAI      ProviderType = "openai"
+	ProviderGemini      ProviderType = "gemini"
+	ProviderClaude      ProviderType = "claude"
+	ProviderGrok        ProviderType = "grok"
+	ProviderTogether    ProviderType = "together"
+	ProviderOpenRouter  ProviderType = "openrouter"
+	ProviderMistral     ProviderType = "mistral"
+	ProviderCohere      ProviderType = "cohere"
+	ProviderHuggingFace ProviderType = "huggingface"
+	ProviderReplicate   ProviderType = "replicate"
+	ProviderVoyage      ProviderType = "voyage"
+	ProviderFireworks   ProviderType = "fireworks"
 )
 
 // KeyUsage tracks usage for each API key
@@ -60,7 +71,7 @@ type Limits struct {
 // APIKey returns the first API key for backward compatibility
 func (c *LLMConfig) APIKey() string {
 	if len(c.APIKeys) > 0 {
-		return c.APIKeys[0]
+		return resolveKey(c.APIKeys[0])
 	}
 	return ""
 }
@@ -93,6 +104,15 @@ func (c *LLMConfig) NextAPIKey() string {
 	key := c.APIKeys[0]
 	c.APIKeys = append(c.APIKeys[1:], key)
 	c.usages = append(c.usages[1:], c.usages[0])
+	return resolveKey(key)
+}
+
+// resolveKey resolves ${VAR} to os.Getenv(VAR)
+func resolveKey(key string) string {
+	if strings.HasPrefix(key, "${") && strings.HasSuffix(key, "}") {
+		varName := strings.TrimSuffix(strings.TrimPrefix(key, "${"), "}")
+		return os.Getenv(varName)
+	}
 	return key
 }
 
@@ -124,7 +144,7 @@ func (c *LLMConfig) SelectLeastLoadedKey() string {
 		c.usages = append(c.usages[minIndex:], c.usages[:minIndex]...)
 	}
 
-	return c.APIKeys[0]
+	return resolveKey(c.APIKeys[0])
 }
 
 // UpdateUsage updates usage for the current key
@@ -140,13 +160,13 @@ func (c *LLMConfig) UpdateUsage(reqCount, tokenCount int) {
 
 // LLMRequest represents a request to generate text
 type LLMRequest struct {
-	Prompt    string                   `json:"prompt"`
-	Messages  []map[string]interface{} `json:"messages,omitempty"`
-	Model     string                   `json:"model,omitempty"`
-	MaxTokens int                      `json:"max_tokens,omitempty"`
-	Stream    bool                     `json:"stream,omitempty"`
-	User      string                   `json:"user,omitempty"`
-	Params    map[string]any           `json:"params,omitempty"`
+	Prompt    string           `json:"prompt"`
+	Messages  []map[string]any `json:"messages,omitempty"`
+	Model     string           `json:"model,omitempty"`
+	MaxTokens int              `json:"max_tokens,omitempty"`
+	Stream    bool             `json:"stream,omitempty"`
+	User      string           `json:"user,omitempty"`
+	Params    map[string]any   `json:"params,omitempty"`
 }
 
 // LLMResponse represents the response from LLM
@@ -165,6 +185,29 @@ type LLMStreamResponse struct {
 	Done         bool   `json:"done"`
 }
 
+// EmbeddingsRequest represents a request to create embeddings
+type EmbeddingsRequest struct {
+	Model  string         `json:"model"`
+	Input  []string       `json:"input"`
+	User   string         `json:"user,omitempty"`
+	Params map[string]any `json:"params,omitempty"`
+}
+
+// EmbeddingsResponse represents the response from embeddings
+type EmbeddingsResponse struct {
+	Embeddings []Embedding `json:"embeddings"`
+	Usage      TokenUsage  `json:"usage"`
+}
+
+// Embedding represents a single embedding vector
+type Embedding []float64
+
+// TokenUsage tracks token usage for embeddings
+type TokenUsage struct {
+	PromptTokens int `json:"prompt_tokens"`
+	TotalTokens  int `json:"total_tokens"`
+}
+
 // NewLLMProvider creates a new LLM provider based on config
 func NewLLMProvider(config *LLMConfig) (LLMProvider, error) {
 	switch config.Type {
@@ -176,6 +219,22 @@ func NewLLMProvider(config *LLMConfig) (LLMProvider, error) {
 		return NewClaudeProvider(config), nil
 	case ProviderGrok:
 		return NewGrokProvider(config), nil
+	case ProviderTogether:
+		return NewTogetherProvider(config), nil
+	case ProviderOpenRouter:
+		return NewOpenRouterProvider(config), nil
+	case ProviderMistral:
+		return NewMistralProvider(config), nil
+	case ProviderCohere:
+		return NewCohereProvider(config), nil
+	case ProviderHuggingFace:
+		return NewHuggingFaceProvider(config), nil
+	case ProviderReplicate:
+		return NewReplicateProvider(config), nil
+	case ProviderVoyage:
+		return NewVoyageProvider(config), nil
+	case ProviderFireworks:
+		return NewFireworksProvider(config), nil
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", config.Type)
 	}

@@ -39,14 +39,14 @@ flowchart TD
 
 **Algorithm:** `round_robin`
 
-Distributes requests evenly across all available keys in a provider, respecting rate limits.
+Distributes requests randomly across all available keys in a provider, respecting rate limits.
 
 **Use Case:** Simple load distribution when all keys have similar performance and limits.
 
 **Algorithm:**
 1. Filter keys that are not at rate limit
 2. If no available keys, use all keys (allow bursting)
-3. Select key using round-robin from available keys
+3. Select a random key from the available keys
 
 ### Least Loaded
 
@@ -71,19 +71,15 @@ Combines multiple metrics with configurable weights for intelligent key selectio
 
 **Scoring Formula:**
 ```go
-score = w.req_ratio * reqUsage +
-        w.token_ratio * tokenUsage +
-        w.error_score * errorRate +
-        w.latency * avgLatency +
-        w.cost_ratio * estCost
+score := w.ReqRatio*reqUsage + w.TokenRatio*tokenUsage + w.ErrorScore*errorScore + w.Latency*latency + w.CostRatio*estimatedCost
 ```
 
 **Where:**
 - `reqUsage`: Total requests processed by key (higher = more used)
 - `tokenUsage`: Total tokens processed by key (higher = more used)
-- `errorRate`: Error count / total requests (0-1, higher = worse)
-- `avgLatency`: Average response time in milliseconds (higher = slower)
-- `estCost`: Estimated cost per request in USD (higher = more expensive)
+- `errorScore`: Total error count for key (higher = worse)
+- `latency`: Latest latency measurement in milliseconds (higher = slower)
+- `estimatedCost`: Estimated cost for average request (higher = more expensive)
 
 **Lower scores are better** - algorithm selects key with minimum score.
 
@@ -133,12 +129,35 @@ Automatic key rotation when approaching limits:
 3. **Rotation:** Switch to alternative key
 4. **Cooldown:** Allow time for limits to reset
 
+### Session Limits
+
+Configure token limits per time window:
+
+- **Session Limit**: Maximum tokens per session period
+- **Session Type**: Time window (e.g., "1h", "5m", "1d")
+- **Rolling Windows**: Continuous time-based limits
+
+Session limits are checked in addition to per-minute limits for long-running sessions.
+
 ### Provider Failover
 
 When a provider is unavailable:
 1. Mark provider as degraded
 2. Route traffic to alternative providers
 3. Gradually increase traffic as provider recovers
+
+### Fallback Configuration
+
+Configure fallback behavior when primary providers fail:
+
+- **Enabled**: Enable/disable fallback functionality
+- **Max Providers**: Maximum number of fallback providers to try
+- **Provider List**: Ordered list of fallback provider IDs
+
+Fallback occurs when:
+- All keys for a provider are rate limited
+- Provider returns persistent errors
+- Network connectivity issues
 
 ## Metrics Collection
 
@@ -181,10 +200,14 @@ policy:
     max_attempts: 3           # Max retry attempts on failure
     timeout: "30s"            # Timeout per attempt
     interval: "1s"            # Delay between retries
-  cache:
-    enabled: true             # Enable response caching
-    ttl_seconds: 10           # Cache TTL
-```
+   cache:
+     enabled: true             # Enable response caching
+     ttl_seconds: 10           # Cache TTL
+   fallback:
+     enabled: true             # Enable fallback to other providers
+     max_providers: 2          # Max fallback providers to try
+     providers: []             # List of fallback provider IDs
+ ```
 
 **Priority Options:**
 - `balanced`: Equal weights for all metrics (0.2 each)
@@ -204,6 +227,9 @@ llm_providers:
     limits:
       req_per_min: 200         # Requests per minute per key
       tokens_per_min: 100000   # Tokens per minute per key
+      max_tokens: 400000       # Maximum tokens per request
+      session_limit: 2000000   # Tokens per session (optional)
+      session_type: "1h"       # Session window: "5m", "1h", "1d" (optional)
 ```
 
 ## Algorithm Details
@@ -213,19 +239,26 @@ llm_providers:
 The hybrid algorithm calculates scores for each available key using the `calculateScore` method:
 
 ```go
-func (s *Selector) calculateScore(providerID string, key *config.Key, model string) float64 {
-    w := s.cfg.Policy.HybridWeights
+func (s *Selector) calculateScore(pCfg *config.Provider, key *config.Key, model string, policy config.Policy) float64 {
+    w := policy.HybridWeights
 
+    providerID := pCfg.ID
     reqUsage, _ := s.store.GetUsage(providerID, key.ID, "req")
     tokenUsage, _ := s.store.GetUsage(providerID, key.ID, "tokens")
     errorScore, _ := s.store.GetUsage(providerID, key.ID, "errors")
     latency, _ := s.store.GetUsage(providerID, key.ID, "latency")
 
-    // Estimate cost (1000 tokens per request)
+    // Estimate cost based on average tokens (assume 1000 tokens per request)
     avgTokens := 1000.0
-    estimatedCost := (key.Pricing.InputTokenCost + key.Pricing.OutputTokenCost) * avgTokens / 1000
+    estimatedCost := (pCfg.Pricing.InputTokenCost + pCfg.Pricing.OutputTokenCost) * avgTokens / 1000
 
     score := w.ReqRatio*reqUsage + w.TokenRatio*tokenUsage + w.ErrorScore*errorScore + w.Latency*latency + w.CostRatio*estimatedCost
+
+    // Prioritize providers with higher MaxTokens (subtract to lower score)
+    if pCfg.Limits.MaxTokens > 0 {
+        score -= float64(pCfg.Limits.MaxTokens) / 1000.0 * 0.1 // Small weight for MaxTokens
+    }
+
     return score
 }
 ```
@@ -239,7 +272,7 @@ func (s *Selector) calculateScore(providerID string, key *config.Key, model stri
 
 ### Selection Process
 
-1. **Resolve Model:** Map model alias to provider ID using `model_aliases`
+1. **Resolve Model:** Parse provider:model format or use model aliases
 2. **Get Provider Config:** Retrieve provider configuration from `llm_providers`
 3. **Select Algorithm:** Choose based on `policy.algorithm` setting
 4. **Filter Rate Limited Keys:** Skip keys exceeding req/min or tokens/min limits

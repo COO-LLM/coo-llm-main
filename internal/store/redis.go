@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -115,9 +116,24 @@ func (r *RedisStore) GetCache(key string) (string, error) {
 func (r *RedisStore) StoreMetric(name string, value float64, tags map[string]string, timestamp int64) error {
 	ctx := context.Background()
 	key := fmt.Sprintf("metrics:%s", name)
-	// Store as sorted set with timestamp as score, value as member
-	member := fmt.Sprintf("%f", value)
-	return r.client.ZAdd(ctx, key, &redis.Z{Score: float64(timestamp), Member: member}).Err()
+
+	// Store metric point with tags as JSON
+	point := MetricPoint{
+		Value:     value,
+		Timestamp: timestamp,
+		Tags:      tags,
+	}
+
+	pointJSON, err := json.Marshal(point)
+	if err != nil {
+		return err
+	}
+
+	// Store as sorted set with timestamp as score, JSON as member
+	return r.client.ZAdd(ctx, key, &redis.Z{
+		Score:  float64(timestamp),
+		Member: string(pointJSON),
+	}).Err()
 }
 
 func (r *RedisStore) GetMetrics(name string, tags map[string]string, start, end int64) ([]MetricPoint, error) {
@@ -130,15 +146,33 @@ func (r *RedisStore) GetMetrics(name string, tags map[string]string, start, end 
 	if err != nil {
 		return nil, err
 	}
+
 	var points []MetricPoint
 	for _, z := range results {
-		var value float64
-		fmt.Sscanf(z.Member.(string), "%f", &value)
-		points = append(points, MetricPoint{
-			Value:     value,
-			Timestamp: int64(z.Score),
-			Tags:      make(map[string]string),
-		})
+		var point MetricPoint
+		if err := json.Unmarshal([]byte(z.Member.(string)), &point); err != nil {
+			// Fallback for old format (just value)
+			var value float64
+			fmt.Sscanf(z.Member.(string), "%f", &value)
+			point = MetricPoint{
+				Value:     value,
+				Timestamp: int64(z.Score),
+				Tags:      make(map[string]string),
+			}
+		}
+
+		// Filter by tags if specified
+		match := true
+		for k, v := range tags {
+			if point.Tags[k] != v {
+				match = false
+				break
+			}
+		}
+
+		if match {
+			points = append(points, point)
+		}
 	}
 	return points, nil
 }

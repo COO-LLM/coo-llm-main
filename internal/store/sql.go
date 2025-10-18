@@ -3,20 +3,36 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/zerolog"
 )
 
 type SQLStore struct {
 	db     *sql.DB
 	logger zerolog.Logger
+	dbType string // "postgres" or "sqlite"
 }
 
 func NewSQLStore(connStr string, logger zerolog.Logger) (*SQLStore, error) {
-	db, err := sql.Open("postgres", connStr)
+	var db *sql.DB
+	var dbType string
+	var err error
+
+	// Detect database type from connection string
+	if strings.Contains(connStr, "sqlite") || strings.HasSuffix(connStr, ".db") || strings.HasSuffix(connStr, ".sqlite") || strings.HasPrefix(connStr, "./") || strings.HasPrefix(connStr, "/") {
+		db, err = sql.Open("sqlite3", connStr)
+		dbType = "sqlite"
+	} else {
+		db, err = sql.Open("postgres", connStr)
+		dbType = "postgres"
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -27,41 +43,83 @@ func NewSQLStore(connStr string, logger zerolog.Logger) (*SQLStore, error) {
 	}
 
 	// Create tables if not exist
-	if err := createTables(db); err != nil {
+	if err := createTables(db, dbType); err != nil {
 		return nil, err
 	}
 
-	return &SQLStore{db: db, logger: logger}, nil
+	return &SQLStore{db: db, logger: logger, dbType: dbType}, nil
 }
 
-func createTables(db *sql.DB) error {
-	queries := []string{
-		`CREATE TABLE IF NOT EXISTS usage_metrics (
-			id SERIAL PRIMARY KEY,
-			provider VARCHAR(50) NOT NULL,
-			key_id VARCHAR(100) NOT NULL,
-			metric VARCHAR(50) NOT NULL,
-			value DOUBLE PRECISION NOT NULL,
-			timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			UNIQUE(provider, key_id, metric)
-		)`,
-		`CREATE TABLE IF NOT EXISTS usage_history (
-			id SERIAL PRIMARY KEY,
-			provider VARCHAR(50) NOT NULL,
-			key_id VARCHAR(100) NOT NULL,
-			metric VARCHAR(50) NOT NULL,
-			delta DOUBLE PRECISION NOT NULL,
-			timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		)`,
-		`CREATE TABLE IF NOT EXISTS cache (
-			key VARCHAR(255) PRIMARY KEY,
-			value TEXT NOT NULL,
-			expiry TIMESTAMP WITH TIME ZONE
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_usage_metrics_provider_key_metric ON usage_metrics(provider, key_id, metric)`,
-		`CREATE INDEX IF NOT EXISTS idx_usage_history_timestamp ON usage_history(timestamp)`,
-		`CREATE INDEX IF NOT EXISTS idx_usage_history_provider_key_metric ON usage_history(provider, key_id, metric)`,
-		`CREATE INDEX IF NOT EXISTS idx_cache_expiry ON cache(expiry)`,
+// placeholder returns the appropriate placeholder for the database type
+func (s *SQLStore) placeholder(n int) string {
+	if s.dbType == "sqlite" {
+		return "?"
+	}
+	return fmt.Sprintf("$%d", n)
+}
+
+func createTables(db *sql.DB, dbType string) error {
+
+	var queries []string
+	if dbType == "sqlite" {
+		queries = []string{
+			`CREATE TABLE IF NOT EXISTS usage_metrics (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				provider TEXT NOT NULL,
+				key_id TEXT NOT NULL,
+				metric TEXT NOT NULL,
+				value REAL NOT NULL,
+				timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(provider, key_id, metric)
+			)`,
+			`CREATE TABLE IF NOT EXISTS usage_history (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				provider TEXT NOT NULL,
+				key_id TEXT NOT NULL,
+				metric TEXT NOT NULL,
+				delta REAL NOT NULL,
+				timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+			)`,
+			`CREATE TABLE IF NOT EXISTS cache (
+				key TEXT PRIMARY KEY,
+				value TEXT NOT NULL,
+				expiry DATETIME
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_usage_metrics_provider_key_metric ON usage_metrics(provider, key_id, metric)`,
+			`CREATE INDEX IF NOT EXISTS idx_usage_history_timestamp ON usage_history(timestamp)`,
+			`CREATE INDEX IF NOT EXISTS idx_usage_history_provider_key_metric ON usage_history(provider, key_id, metric)`,
+			`CREATE INDEX IF NOT EXISTS idx_cache_expiry ON cache(expiry)`,
+		}
+	} else {
+		// PostgreSQL queries
+		queries = []string{
+			`CREATE TABLE IF NOT EXISTS usage_metrics (
+				id SERIAL PRIMARY KEY,
+				provider VARCHAR(50) NOT NULL,
+				key_id VARCHAR(100) NOT NULL,
+				metric VARCHAR(50) NOT NULL,
+				value DOUBLE PRECISION NOT NULL,
+				timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+				UNIQUE(provider, key_id, metric)
+			)`,
+			`CREATE TABLE IF NOT EXISTS usage_history (
+				id SERIAL PRIMARY KEY,
+				provider VARCHAR(50) NOT NULL,
+				key_id VARCHAR(100) NOT NULL,
+				metric VARCHAR(50) NOT NULL,
+				delta DOUBLE PRECISION NOT NULL,
+				timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+			)`,
+			`CREATE TABLE IF NOT EXISTS cache (
+				key VARCHAR(255) PRIMARY KEY,
+				value TEXT NOT NULL,
+				expiry TIMESTAMP WITH TIME ZONE
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_usage_metrics_provider_key_metric ON usage_metrics(provider, key_id, metric)`,
+			`CREATE INDEX IF NOT EXISTS idx_usage_history_timestamp ON usage_history(timestamp)`,
+			`CREATE INDEX IF NOT EXISTS idx_usage_history_provider_key_metric ON usage_history(provider, key_id, metric)`,
+			`CREATE INDEX IF NOT EXISTS idx_cache_expiry ON cache(expiry)`,
+		}
 	}
 
 	for _, query := range queries {
@@ -74,10 +132,13 @@ func createTables(db *sql.DB) error {
 
 func (s *SQLStore) GetUsage(provider, keyID, metric string) (float64, error) {
 	var value float64
-	err := s.db.QueryRow(
-		"SELECT value FROM usage_metrics WHERE provider = $1 AND key_id = $2 AND metric = $3",
-		provider, keyID, metric,
-	).Scan(&value)
+	var query string
+	if s.dbType == "sqlite" {
+		query = "SELECT value FROM usage_metrics WHERE provider = ? AND key_id = ? AND metric = ?"
+	} else {
+		query = "SELECT value FROM usage_metrics WHERE provider = $1 AND key_id = $2 AND metric = $3"
+	}
+	err := s.db.QueryRow(query, provider, keyID, metric).Scan(&value)
 
 	if err == sql.ErrNoRows {
 		s.logger.Debug().Str("operation", "GetUsage").Str("provider", provider).Str("keyID", keyID).Str("metric", metric).Float64("value", 0).Msg("store operation - no rows")

@@ -2,32 +2,82 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/user/coo-llm/internal/balancer"
 	"github.com/user/coo-llm/internal/config"
+	"github.com/user/coo-llm/internal/log"
 	"github.com/user/coo-llm/internal/store"
 )
 
 type AdminHandler struct {
 	cfg      *config.Config
-	store    store.RuntimeStore
+	store    store.StoreProvider
 	selector *balancer.Selector
+	logger   *log.Logger
 }
 
-func NewAdminHandler(cfg *config.Config, store store.RuntimeStore, selector *balancer.Selector) *AdminHandler {
-	return &AdminHandler{cfg: cfg, store: store, selector: selector}
+func NewAdminHandler(cfg *config.Config, store store.StoreProvider, selector *balancer.Selector, logger *log.Logger) *AdminHandler {
+	return &AdminHandler{cfg: cfg, store: store, selector: selector, logger: logger}
 }
 
 func (h *AdminHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
-	// Return config with sensitive data masked
-	safeCfg := h.maskSensitiveConfig(h.cfg)
+	// Load config from store
+	cfg, err := h.store.LoadConfig()
+	if err != nil {
+		// Fallback to in-memory config if store fails
+		cfg = h.maskSensitiveConfig(h.cfg)
+	} else {
+		// Store already has masked config, but ensure it's fully masked
+		cfg = h.maskSensitiveConfig(cfg)
+	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(safeCfg)
+	json.NewEncoder(w).Encode(cfg)
+}
+
+func (h *AdminHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	var newCfg config.Config
+	if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Validate the config
+	if err := config.ValidateConfig(&newCfg); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid config: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Prevent updating sensitive fields (provider API keys, admin key, etc.)
+	// Only allow updating public fields like api_keys, policy, etc.
+	currentCfg, err := h.store.LoadConfig()
+	if err != nil {
+		http.Error(w, "Failed to load current config", http.StatusInternalServerError)
+		return
+	}
+
+	// Merge: keep sensitive fields from current, update public from new
+	updatedCfg := *currentCfg
+	updatedCfg.APIKeys = newCfg.APIKeys
+	updatedCfg.ModelAliases = newCfg.ModelAliases
+	updatedCfg.Policy = newCfg.Policy
+	// Add other public fields as needed, but not LLMProviders (to protect keys)
+
+	// Save updated config to store
+	if err := h.store.SaveConfig(&updatedCfg); err != nil {
+		http.Error(w, "Failed to save config", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Config updated successfully"})
 }
 
 func (h *AdminHandler) maskSensitiveConfig(cfg *config.Config) *config.Config {
@@ -82,6 +132,115 @@ func (h *AdminHandler) ValidateConfig(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Config is valid"))
+}
+
+func (h *AdminHandler) UpdatePolicy(w http.ResponseWriter, r *http.Request) {
+	// Parse request body
+	var policyUpdate struct {
+		Algorithm string `json:"algorithm"`
+		Priority  string `json:"priority"`
+		Cache     *struct {
+			Enabled    bool  `json:"enabled"`
+			TTLSeconds int64 `json:"ttl_seconds"`
+		} `json:"cache,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&policyUpdate); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Normalize algorithm (convert dash to underscore for internal consistency)
+	policyUpdate.Algorithm = strings.ReplaceAll(policyUpdate.Algorithm, "-", "_")
+
+	// Validate algorithm
+	validAlgorithms := map[string]bool{
+		"random":       true,
+		"round_robin":  true,
+		"least_loaded": true,
+		"weighted":     true,
+	}
+	if !validAlgorithms[policyUpdate.Algorithm] {
+		http.Error(w, fmt.Sprintf("Invalid algorithm: %s. Must be one of: random, round_robin, least_loaded, weighted", policyUpdate.Algorithm), http.StatusBadRequest)
+		return
+	}
+
+	// Normalize priority (convert dash to underscore for internal consistency)
+	policyUpdate.Priority = strings.ReplaceAll(policyUpdate.Priority, "-", "_")
+
+	// Validate priority
+	validPriorities := map[string]bool{
+		"latency":      true,
+		"cost":         true,
+		"availability": true,
+		"quality":      true,
+		"balanced":     true,
+	}
+	if !validPriorities[policyUpdate.Priority] {
+		http.Error(w, fmt.Sprintf("Invalid priority: %s. Must be one of: latency, cost, availability, quality, balanced", policyUpdate.Priority), http.StatusBadRequest)
+		return
+	}
+
+	// Validate cache TTL if cache is provided
+	if policyUpdate.Cache != nil && policyUpdate.Cache.Enabled && policyUpdate.Cache.TTLSeconds < 1 {
+		http.Error(w, "Cache TTL must be at least 1 second", http.StatusBadRequest)
+		return
+	}
+
+	// Load current config
+	currentCfg, err := h.store.LoadConfig()
+	if err != nil {
+		logger := h.logger.GetLogger()
+		logger.Error().Err(err).Msg("Failed to load current config")
+		http.Error(w, "Failed to load current config", http.StatusInternalServerError)
+		return
+	}
+
+	// Update policy fields
+	currentCfg.Policy.Algorithm = policyUpdate.Algorithm
+	currentCfg.Policy.Priority = policyUpdate.Priority
+
+	if policyUpdate.Cache != nil {
+		currentCfg.Policy.Cache.Enabled = policyUpdate.Cache.Enabled
+		currentCfg.Policy.Cache.TTLSeconds = policyUpdate.Cache.TTLSeconds
+	}
+
+	// Save updated config to store
+	if err := h.store.SaveConfig(currentCfg); err != nil {
+		logger := h.logger.GetLogger()
+		logger.Error().Err(err).Msg("Failed to save config")
+		http.Error(w, "Failed to save config", http.StatusInternalServerError)
+		return
+	}
+
+	// Update in-memory config (h.cfg is a pointer, so we can update it directly)
+	h.cfg.Policy.Algorithm = policyUpdate.Algorithm
+	h.cfg.Policy.Priority = policyUpdate.Priority
+	if policyUpdate.Cache != nil {
+		h.cfg.Policy.Cache.Enabled = policyUpdate.Cache.Enabled
+		h.cfg.Policy.Cache.TTLSeconds = policyUpdate.Cache.TTLSeconds
+	}
+
+	logger := h.logger.GetLogger()
+	logger.Info().
+		Str("algorithm", policyUpdate.Algorithm).
+		Str("priority", policyUpdate.Priority).
+		Bool("cache_enabled", currentCfg.Policy.Cache.Enabled).
+		Int64("cache_ttl", currentCfg.Policy.Cache.TTLSeconds).
+		Msg("Policy updated successfully")
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Policy updated successfully",
+		"policy": map[string]interface{}{
+			"algorithm": currentCfg.Policy.Algorithm,
+			"priority":  currentCfg.Policy.Priority,
+			"cache": map[string]interface{}{
+				"enabled":     currentCfg.Policy.Cache.Enabled,
+				"ttl_seconds": currentCfg.Policy.Cache.TTLSeconds,
+			},
+		},
+	})
 }
 
 func (h *AdminHandler) GetMetrics(w http.ResponseWriter, r *http.Request) {
@@ -327,6 +486,55 @@ func (h *AdminHandler) aggregateByGroups(allPoints map[string][]store.MetricPoin
 	return aggregated
 }
 
+func (h *AdminHandler) Login(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AdminID  string `json:"admin_id"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.AdminID == h.cfg.Server.WebUI.AdminID && req.Password == h.cfg.Server.WebUI.AdminPassword {
+		// Generate JWT token
+		token, err := h.generateJWTToken(req.AdminID)
+		if err != nil {
+			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"token": token,
+			"user": map[string]string{
+				"id":       req.AdminID,
+				"username": req.AdminID,
+				"role":     "admin",
+			},
+		})
+	} else {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+	}
+}
+
+func (h *AdminHandler) generateJWTToken(adminID string) (string, error) {
+	// Use admin API key as JWT secret, or a configured secret
+	secret := h.cfg.Server.AdminAPIKey
+	if secret == "" {
+		secret = "default-jwt-secret-change-in-production"
+	}
+
+	claims := jwt.MapClaims{
+		"admin_id": adminID,
+		"type":     "webui",
+		"iat":      time.Now().Unix(),
+		"exp":      time.Now().Add(24 * time.Hour).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
+}
+
 func (h *AdminHandler) matchesGroup(p store.MetricPoint, groupBy []string, keyParts []string) bool {
 	for i, g := range groupBy {
 		if p.Tags[g] != keyParts[i] {
@@ -336,25 +544,343 @@ func (h *AdminHandler) matchesGroup(p store.MetricPoint, groupBy []string, keyPa
 	return true
 }
 
-func SetupAdminRoutes(r chi.Router, cfg *config.Config, store store.RuntimeStore, selector *balancer.Selector) {
-	adminRouter := chi.NewRouter()
-	adminRouter.Use(AdminAuthMiddleware(cfg.Server.AdminAPIKey))
+// Client management methods
+func (h *AdminHandler) CreateClient(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ClientID         string   `json:"client_id"`
+		APIKey           string   `json:"api_key"`
+		Description      string   `json:"description"`
+		AllowedProviders []string `json:"allowed_providers"`
+	}
 
-	handler := NewAdminHandler(cfg, store, selector)
-	adminRouter.Get("/admin/v1/config", handler.GetConfig)
-	adminRouter.Post("/admin/v1/config/validate", handler.ValidateConfig)
-	adminRouter.Get("/admin/v1/metrics", handler.GetMetrics)
-	adminRouter.Get("/admin/v1/clients", handler.GetClientStats)
-	adminRouter.Get("/admin/v1/stats", handler.GetStats)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	r.Mount("/", adminRouter)
+	if req.ClientID == "" || req.APIKey == "" {
+		http.Error(w, "client_id and api_key are required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.store.CreateClient(req.ClientID, req.APIKey, req.Description, req.AllowedProviders)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "created", "client_id": req.ClientID})
 }
 
-func AdminAuthMiddleware(adminKey string) func(http.Handler) http.Handler {
+func (h *AdminHandler) ListClients(w http.ResponseWriter, r *http.Request) {
+	clients, err := h.store.ListClients()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"clients": clients})
+}
+
+func (h *AdminHandler) GetClient(w http.ResponseWriter, r *http.Request) {
+	clientID := chi.URLParam(r, "client_id")
+	if clientID == "" {
+		http.Error(w, "client_id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	client, err := h.store.GetClient(clientID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(client)
+}
+
+func (h *AdminHandler) UpdateClient(w http.ResponseWriter, r *http.Request) {
+	clientID := chi.URLParam(r, "client_id")
+	if clientID == "" {
+		http.Error(w, "client_id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Description      string   `json:"description"`
+		AllowedProviders []string `json:"allowed_providers"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err := h.store.UpdateClient(clientID, req.Description, req.AllowedProviders)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "updated", "client_id": clientID})
+}
+
+func (h *AdminHandler) DeleteClient(w http.ResponseWriter, r *http.Request) {
+	clientID := chi.URLParam(r, "client_id")
+	if clientID == "" {
+		http.Error(w, "client_id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	err := h.store.DeleteClient(clientID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "deleted", "client_id": clientID})
+}
+
+// Enhanced metrics methods
+func (h *AdminHandler) GetClientMetrics(w http.ResponseWriter, r *http.Request) {
+	clientID := chi.URLParam(r, "client_id")
+	if clientID == "" {
+		http.Error(w, "client_id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	startStr := r.URL.Query().Get("start")
+	endStr := r.URL.Query().Get("end")
+
+	var start, end int64
+	if startStr != "" {
+		start, _ = strconv.ParseInt(startStr, 10, 64)
+	} else {
+		start = time.Now().Add(-time.Hour * 24).Unix() // last 24 hours
+	}
+
+	if endStr != "" {
+		end, _ = strconv.ParseInt(endStr, 10, 64)
+	} else {
+		end = time.Now().Unix()
+	}
+
+	metrics, err := h.store.GetClientMetrics(clientID, start, end)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(metrics)
+}
+
+func (h *AdminHandler) GetProviderMetrics(w http.ResponseWriter, r *http.Request) {
+	providerID := chi.URLParam(r, "provider_id")
+	if providerID == "" {
+		http.Error(w, "provider_id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	startStr := r.URL.Query().Get("start")
+	endStr := r.URL.Query().Get("end")
+
+	var start, end int64
+	if startStr != "" {
+		start, _ = strconv.ParseInt(startStr, 10, 64)
+	} else {
+		start = time.Now().Add(-time.Hour * 24).Unix() // last 24 hours
+	}
+
+	if endStr != "" {
+		end, _ = strconv.ParseInt(endStr, 10, 64)
+	} else {
+		end = time.Now().Unix()
+	}
+
+	metrics, err := h.store.GetProviderMetrics(providerID, start, end)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(metrics)
+}
+
+func (h *AdminHandler) GetGlobalMetrics(w http.ResponseWriter, r *http.Request) {
+	startStr := r.URL.Query().Get("start")
+	endStr := r.URL.Query().Get("end")
+
+	var start, end int64
+	if startStr != "" {
+		start, _ = strconv.ParseInt(startStr, 10, 64)
+	} else {
+		start = time.Now().Add(-time.Hour * 24).Unix() // last 24 hours
+	}
+
+	if endStr != "" {
+		end, _ = strconv.ParseInt(endStr, 10, 64)
+	} else {
+		end = time.Now().Unix()
+	}
+
+	metrics, err := h.store.GetGlobalMetrics(start, end)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(metrics)
+}
+
+func SetupAdminRoutes(r chi.Router, cfg *config.Config, store store.StoreProvider, selector *balancer.Selector, logger *log.Logger) {
+	handler := NewAdminHandler(cfg, store, selector, logger)
+
+	// Login endpoint (no auth required)
+	r.Post("/login", handler.Login)
+
+	// Admin routes with auth
+	adminRouter := chi.NewRouter()
+	adminRouter.Use(AdminAuthMiddleware(cfg.Server.AdminAPIKey, cfg))
+	adminRouter.Use(RateLimitMiddleware())
+	adminRouter.Use(AuditLogMiddleware(logger))
+
+	adminRouter.Get("/v1/config", handler.GetConfig)
+	adminRouter.Post("/v1/config", handler.UpdateConfig)
+	adminRouter.Post("/v1/config/validate", handler.ValidateConfig)
+	adminRouter.Put("/v1/config/policy", handler.UpdatePolicy)
+	adminRouter.Get("/v1/metrics", handler.GetMetrics)
+	adminRouter.Get("/v1/clients", handler.GetClientStats)
+	adminRouter.Get("/v1/stats", handler.GetStats)
+
+	// Client management
+	adminRouter.Post("/v1/clients", handler.CreateClient)
+	adminRouter.Get("/v1/clients/list", handler.ListClients)
+	adminRouter.Get("/v1/clients/{client_id}", handler.GetClient)
+	adminRouter.Put("/v1/clients/{client_id}", handler.UpdateClient)
+	adminRouter.Delete("/v1/clients/{client_id}", handler.DeleteClient)
+
+	// Enhanced metrics
+	adminRouter.Get("/v1/metrics/clients/{client_id}", handler.GetClientMetrics)
+	adminRouter.Get("/v1/metrics/providers/{provider_id}", handler.GetProviderMetrics)
+	adminRouter.Get("/v1/metrics/global", handler.GetGlobalMetrics)
+
+	// Mount admin router
+	r.Mount("/admin", adminRouter)
+}
+
+func SetupWebUIRoutes(r chi.Router, fileServer http.Handler) {
+	// Handle /ui root path (redirect to /ui/)
+	r.Get("/ui", func(w http.ResponseWriter, req *http.Request) {
+		http.Redirect(w, req, "/ui/", http.StatusMovedPermanently)
+	})
+
+	// Create a file server that strips the /ui prefix
+	uiFileServer := http.StripPrefix("/ui", fileServer)
+
+	// Serve all static files under /ui/ - BEFORE catch-all
+	r.Get("/ui/*", func(w http.ResponseWriter, req *http.Request) {
+		// Check if this is a static file request (not a SPA route)
+		path := strings.TrimPrefix(req.URL.Path, "/ui/")
+		if strings.Contains(path, ".") {
+			// This looks like a static file (has extension)
+			uiFileServer.ServeHTTP(w, req)
+		} else {
+			// This is a SPA route, serve index.html
+			req.URL.Path = "/"
+			fileServer.ServeHTTP(w, req)
+		}
+	})
+}
+
+// Rate limiting for admin endpoints
+var requestCounts = make(map[string]int)
+var requestTimestamps = make(map[string]time.Time)
+var rateLimitMutex sync.Mutex
+
+func RateLimitMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Simple rate limiting: 100 requests per minute per IP
+			clientIP := r.RemoteAddr
+			if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+				clientIP = strings.Split(forwarded, ",")[0]
+			}
+
+			rateLimitMutex.Lock()
+			now := time.Now()
+			key := clientIP
+
+			// Reset counter if more than a minute has passed
+			if timestamp, exists := requestTimestamps[key]; exists && now.Sub(timestamp) > time.Minute {
+				requestCounts[key] = 0
+			}
+
+			requestCounts[key]++
+			requestTimestamps[key] = now
+
+			count := requestCounts[key]
+			rateLimitMutex.Unlock()
+
+			if count > 100 {
+				http.Error(w, `{"error": {"message": "Rate limit exceeded", "type": "rate_limit_error"}}`, http.StatusTooManyRequests)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func AuditLogMiddleware(logger *log.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+
+			// Simple audit logging using fmt for now
+			fmt.Printf("[AUDIT] %s %s from %s\n", r.Method, r.URL.Path, r.RemoteAddr)
+
+			next.ServeHTTP(w, r)
+
+			// Log the response
+			duration := time.Since(start)
+			fmt.Printf("[AUDIT] %s %s completed in %dms\n", r.Method, r.URL.Path, duration.Milliseconds())
+		})
+	}
+}
+
+func AdminAuthMiddleware(adminKey string, cfg *config.Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Allow OPTIONS requests for CORS preflight
+			if r.Method == "OPTIONS" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			auth := r.Header.Get("Authorization")
 			if auth == "" {
+				// Add CORS headers even for error responses
+				if cfg.Server.CORS.Enabled {
+					if len(cfg.Server.CORS.AllowedOrigins) == 1 && cfg.Server.CORS.AllowedOrigins[0] == "*" {
+						w.Header().Set("Access-Control-Allow-Origin", "*")
+					}
+					if cfg.Server.CORS.AllowCredentials {
+						w.Header().Set("Access-Control-Allow-Credentials", "true")
+					}
+					if len(cfg.Server.CORS.AllowedMethods) > 0 {
+						w.Header().Set("Access-Control-Allow-Methods", strings.Join(cfg.Server.CORS.AllowedMethods, ", "))
+					}
+					if len(cfg.Server.CORS.AllowedHeaders) > 0 {
+						w.Header().Set("Access-Control-Allow-Headers", strings.Join(cfg.Server.CORS.AllowedHeaders, ", "))
+					}
+				}
 				http.Error(w, `{"error": {"message": "Authorization header required", "type": "authentication_error"}}`, http.StatusUnauthorized)
 				return
 			}
@@ -365,12 +891,161 @@ func AdminAuthMiddleware(adminKey string) func(http.Handler) http.Handler {
 			}
 
 			token := strings.TrimPrefix(auth, "Bearer ")
-			if token != adminKey {
-				http.Error(w, `{"error": {"message": "Invalid admin token", "type": "authentication_error"}}`, http.StatusUnauthorized)
+
+			// Check static admin API key
+			if token == adminKey {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Check JWT token
+			if validateJWTToken(token, adminKey, cfg) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Check legacy webui token (for backward compatibility)
+			if strings.HasPrefix(token, "webui-") {
+				if validateWebUIToken(token, cfg) {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			http.Error(w, `{"error": {"message": "Invalid admin token", "type": "authentication_error"}}`, http.StatusUnauthorized)
+		})
+	}
+}
+
+func validateWebUIToken(token string, cfg *config.Config) bool {
+	parts := strings.Split(token, "-")
+	if len(parts) != 3 || parts[0] != "webui" {
+		return false
+	}
+
+	adminID := parts[1]
+	timestampStr := parts[2]
+
+	// Verify admin ID matches
+	if adminID != cfg.Server.WebUI.AdminID {
+		return false
+	}
+
+	// Parse timestamp
+	timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return false
+	}
+
+	// Check if token is not expired (24 hours)
+	tokenTime := time.Unix(timestamp, 0)
+	if time.Since(tokenTime) > 24*time.Hour {
+		return false
+	}
+
+	return true
+}
+
+func CORSMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !cfg.Server.CORS.Enabled {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Set CORS headers
+			origin := r.Header.Get("Origin")
+			if len(cfg.Server.CORS.AllowedOrigins) == 1 && cfg.Server.CORS.AllowedOrigins[0] == "*" {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+			} else if containsString(cfg.Server.CORS.AllowedOrigins, origin) || containsString(cfg.Server.CORS.AllowedOrigins, "*") {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			}
+
+			if cfg.Server.CORS.AllowCredentials {
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+
+			if len(cfg.Server.CORS.AllowedMethods) > 0 {
+				w.Header().Set("Access-Control-Allow-Methods", strings.Join(cfg.Server.CORS.AllowedMethods, ", "))
+			}
+
+			if len(cfg.Server.CORS.AllowedHeaders) > 0 {
+				if len(cfg.Server.CORS.AllowedHeaders) == 1 && cfg.Server.CORS.AllowedHeaders[0] == "*" {
+					// Copy allowed headers from request
+					if requestHeaders := r.Header.Get("Access-Control-Request-Headers"); requestHeaders != "" {
+						w.Header().Set("Access-Control-Allow-Headers", requestHeaders)
+					} else {
+						w.Header().Set("Access-Control-Allow-Headers", "*")
+					}
+				} else {
+					w.Header().Set("Access-Control-Allow-Headers", strings.Join(cfg.Server.CORS.AllowedHeaders, ", "))
+				}
+			}
+
+			if cfg.Server.CORS.MaxAge > 0 {
+				w.Header().Set("Access-Control-Max-Age", strconv.Itoa(cfg.Server.CORS.MaxAge))
+			}
+
+			// Handle preflight requests
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
 				return
 			}
 
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func containsString(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+func validateJWTToken(tokenString, adminKey string, cfg *config.Config) bool {
+	// Use admin API key as JWT secret, or a configured secret
+	secret := adminKey
+	if secret == "" {
+		secret = "default-jwt-secret-change-in-production"
+	}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secret), nil
+	})
+
+	if err != nil {
+		return false
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		// Verify admin_id matches
+		if adminID, ok := claims["admin_id"].(string); ok {
+			if adminID != cfg.Server.WebUI.AdminID {
+				return false
+			}
+		} else {
+			return false
+		}
+
+		// Verify token type
+		if tokenType, ok := claims["type"].(string); ok {
+			if tokenType != "webui" {
+				return false
+			}
+		} else {
+			return false
+		}
+
+		return true
+	}
+
+	return false
 }

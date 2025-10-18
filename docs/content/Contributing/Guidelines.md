@@ -29,7 +29,7 @@ This project follows a code of conduct to ensure a welcoming environment for all
 
 2. **Clone the repository:**
    ```bash
-   git clone https://github.com/coo-llm/coo-llm-main.git
+   git clone https://github.com/user/coo-llm.git
    cd coo-llm
    ```
 
@@ -77,17 +77,21 @@ coo-llm/
 
 ### 1. Choose an Issue
 
-- Check [GitHub Issues](https://github.com/coo-llm/coo-llm-main/issues) for open tasks
+- Check [GitHub Issues](https://github.com/user/coo-llm/issues) for open tasks
 - Look for issues labeled `good first issue` or `help wanted`
 - Comment on the issue to indicate you're working on it
 
 ### 2. Create a Branch
 
+Follow the branch naming convention:
+
 ```bash
-git checkout -b feature/your-feature-name
+git checkout -b feat/v1.2.x/your-feature-name
 # or
-git checkout -b fix/issue-number-description
+git checkout -b fix/v1.1.x/issue-description
 ```
+
+See [CONTRIBUTING.md](https://github.com/your-org/coo-llm/blob/main/CONTRIBUTING.md) for full branch naming guidelines.
 
 ### 3. Make Changes
 
