@@ -2,10 +2,10 @@ name: CI/CD
 
 on:
   push:
-    branches: [ main, master ]
-    tags: [ 'v*' ]
+    branches: [main, master]
+    tags: ["v*"]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
 
 env:
   REGISTRY: docker.io
@@ -14,39 +14,39 @@ env:
 
 jobs:
   test:
-  runs-on: self-hosted
-  env:
-    GEMINI_KEY_1: ${{ secrets.GEMINI_KEY_1 }}
-  steps:
-  - uses: actions/checkout@v4
+    runs-on: self-hosted
+    env:
+      GEMINI_KEY_1: ${{ secrets.GEMINI_KEY_1 }}
+    steps:
+      - uses: actions/checkout@v4
 
-  - name: Set up Go
-    uses: actions/setup-go@v4
-    with:
-      go-version: '1.23'
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.23"
 
-  - name: Cache Go modules
-    uses: actions/cache@v3
-    with:
-      path: ~/go/pkg/mod
-      key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-      restore-keys: |
-        ${{ runner.os }}-go-
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
-  - name: Download dependencies
-    run: go mod download
+      - name: Download dependencies
+        run: go mod download
 
-  - name: Install build dependencies
-    run: sudo apt-get update && sudo apt-get install -y build-essential
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential
 
-  - name: Run tests
-    run: CGO_ENABLED=1 go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Run tests
+        run: CGO_ENABLED=1 go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
-  - name: Run go vet
-    run: go vet ./...
+      - name: Run go vet
+        run: go vet ./...
 
-  - name: Build
-    run: go build ./cmd/coo-llm
+      - name: Build
+        run: go build ./cmd/coo-llm
 
   release:
     runs-on: ubuntu-latest
@@ -61,46 +61,46 @@ jobs:
             build_ui: false
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Get version
-      id: get_version
-      run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Get version
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=tag
-          type=raw,value=latest,enable=${{ matrix.build_ui }}
-        flavor: |
-          suffix=${{ matrix.variant }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ matrix.build_ui }}
+          flavor: |
+            suffix=${{ matrix.variant }}
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        build-args: |
-          VERSION=${{ steps.get_version.outputs.version }}
-          BUILD_UI=${{ matrix.build_ui }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.get_version.outputs.version }}
+            BUILD_UI=${{ matrix.build_ui }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   docs:
     runs-on: self-hosted
@@ -113,8 +113,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
           cache-dependency-path: docs/package-lock.json
 
       - name: Install dependencies
